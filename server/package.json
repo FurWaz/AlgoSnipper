@@ -1,0 +1,19 @@
+{
+	"name": "algosnipper-server",
+	"description": "Server part of the extension.",
+	"version": "0.0.1",
+	"author": "FurWaz",
+	"license": "MIT",
+	"engines": {
+		"node": "*"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/FurWaz/AlgoSnipper.git"
+	},
+	"dependencies": {
+		"vscode-languageserver": "^7.0.0",
+		"vscode-languageserver-textdocument": "^1.0.1"
+	},
+	"scripts": {}
+}
