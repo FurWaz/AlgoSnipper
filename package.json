@@ -58,10 +58,6 @@
 				"title": "Inserts an arrow in the code"
 			},
 			{
-				"command": "algosnipper.furryMode",
-				"title": "Toogles furry mode"
-			},
-			{
 				"command": "algosnipper.launchDoom",
 				"title": "Starts doom"
 			}

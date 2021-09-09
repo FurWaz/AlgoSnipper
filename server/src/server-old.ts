@@ -17,7 +17,8 @@ import {
 	InitializeResult,
 	Position,
 	MarkupKind,
-	Hover
+	Hover,
+	HoverParams
 } from 'vscode-languageserver/node';
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
@@ -55,8 +56,7 @@ connection.onInitialize((params: InitializeParams) => {
 			// Tell the client that this server supports code completion.
 			completionProvider: {
 				resolveProvider: true
-			},
-			hoverProvider: true
+			}
 		}
 	};
 	if (hasWorkspaceFolderCapability) {
@@ -425,7 +425,7 @@ connection.onCompletionResolve(
 			item.documentation = { kind: MarkupKind.Markdown, value: val };
 		} else {
 			let cur_var = lexiqueVars[item.data - lexiqueTypes.length];
-			item.detail = "Variable" + cur_var.name;
+			item.detail = "Variable " + cur_var.name
 			let val = "```algo";
 			val += "\nnom: " + lexiqueVars[item.data - lexiqueTypes.length].name;
 			val += "\ntype: " + lexiqueVars[item.data - lexiqueTypes.length].type;
@@ -439,52 +439,12 @@ connection.onCompletionResolve(
 	}
 );
 
-connection.onHover(({ textDocument, position }): Hover | undefined => {
-    const document = documents.get(textDocument.uri);
-	if (document == null) {
-		return undefined;
+connection.onHover(
+	(param: HoverParams): Hover => {
+		let hov: Hover = {contents: {language: "algo", value: "salut"}, range: undefined};
+		return hov;
 	}
-	
-	let start = position.character;
-	let end = start;
-	let char = document.getText({start: {line: position.line, character: start-1}, end: {line: position.line, character: start}});
-	while (char.match(/[a-zA-Z0-9éêâûùàèçôöïîÏÎÉÊÂÛÙÀÈÔÖÇ_]/)) {
-		start--;
-		if (start <= 0) break;
-		char = document.getText({start: {line: position.line, character: start-1}, end: {line: position.line, character: start}});
-	}
-	char = document.getText({start: {line: position.line, character: end}, end: {line: position.line, character: end+1}});
-	while (char.match(/[a-zA-Z0-9éêâûùàèçôöïîÏÎÉÊÂÛÙÀÈÔÖÇ_]/)) {
-		end++;
-		if (end >= 30) return undefined;
-		char = document.getText({start: {line: position.line, character: end}, end: {line: position.line, character: end+1}});
-	}
-
-	let vName = document.getText({start: {line: position.line, character: start}, end: {line: position.line, character: end}}).trim();
-	let variable = {name: "", type: "", desc: ""};
-	lexiqueVars.forEach(v => {
-		if (v.name == vName)
-			variable = v;
-	});
-    if (variable.name != "") {
-		let val = "Variable **" + variable.name + "**";
-		    val += "\n```algo";
-			val += "\nnom: " + variable.name;
-			val += "\ntype: " + variable.type;
-			val += "\n" + variable.desc;
-			val += "\n```\n\n"
-			let infos = getInfosFromType(variable.type.trim());
-			if (infos!=null) val += getDocFromType(infos);
-		return {
-			contents: {
-				kind: MarkupKind.Markdown,
-				value: val,
-			}
-		};
-    }
-
-    return undefined;
-});
+)
 
 // Make the text document manager listen on the connection
 // for open, change and close text document events

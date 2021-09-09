@@ -1,25 +1,25 @@
 {
-    "Template de [écrire]": {
+    "Template de [ecrire]": {
         "scope": "algo",
-        "prefix": "écrire",
+        "prefix": "ecrire",
         "body": [
-            "écrire(${1:valeur})"
+            "ecrire(${1:valeur})"
         ]
     },
     "Template de [pour]": {
         "scope": "algo",
         "prefix": "pour",
         "body": [
-            "pour ${1:variable} de ${2:début} à ${3:fin} faire",
+            "pour ${1:variable} de ${2:nombre} a ${3:nombre} faire",
             "    $4",
             "fpour"
         ]
     },
-    "Template de [pour/décroissant]": {
+    "Template de [pour/decroissant]": {
         "scope": "algo",
-        "prefix": "pour décroissant",
+        "prefix": "pour decroissant",
         "body": [
-            "pour ${1:variable} décroissant de ${2:début} à ${3:fin} faire",
+            "pour ${1:variable} decroissant de ${2:nombre} a ${3:nombre} faire",
             "    $4",
             "fpour"
         ]
@@ -76,7 +76,7 @@
         "prefix": "fonction",
         "body": [
             "fonction ${1:nom}( ${2:arguments} )",
-            "début",
+            "debut",
             "    $3",
             "fin"
         ]
@@ -86,7 +86,7 @@
         "prefix": "algorithme",
         "body": [
             "algorithme",
-            "début",
+            "debut",
             "    $1",
             "fin"
         ]
@@ -112,7 +112,7 @@
             "-►"
         ]
     },
-    "Template de [différent]": {
+    "Template de [different]": {
         "scope": "algo",
         "prefix": "=/=",
         "body": [

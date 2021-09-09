@@ -14,7 +14,7 @@
             ]
         },
         "keywords": {
-            "match": "fonction[^a-zA-Z0-9]|algorithme[^a-zA-Z0-9]|tant que[^a-zA-Z0-9]|fpour[^a-zA-Z0-9]|pour[^a-zA-Z0-9]|ftant[^a-zA-Z0-9]|sinon[^a-zA-Z0-9]|alors[^a-zA-Z0-9]|si[^a-zA-Z0-9]|fsi[^a-zA-Z0-9]|début[^a-zA-Z0-9]|fin[^a-zA-Z0-9]|à[^a-zA-Z0-9]|faire[^a-zA-Z0-9]|de[^a-zA-Z0-9]|retourne[^a-zA-Z0-9]|et[^a-zA-Z0-9]|non[^a-zA-Z0-9]|ou[^a-zA-Z0-9]|InOut[^a-zA-Z0-9]|mod[^a-zA-Z0-9]|chaque[^a-zA-Z0-9]|dans[^a-zA-Z0-9]|décroissant[^a-zA-Z0-9]|jusque[^a-zA-Z0-9]",
+            "match": "fonction[^a-zA-Z0-9]|algorithme[^a-zA-Z0-9]|tant que[^a-zA-Z0-9]|fpour[^a-zA-Z0-9]|pour[^a-zA-Z0-9]|ftant[^a-zA-Z0-9]|sinon[^a-zA-Z0-9]|alors[^a-zA-Z0-9]|si[^a-zA-Z0-9]|fsi[^a-zA-Z0-9]|debut[^a-zA-Z0-9]|fin[^a-zA-Z0-9]|a[^a-zA-Z0-9]|faire[^a-zA-Z0-9]|de[^a-zA-Z0-9]|retourne[^a-zA-Z0-9]|et[^a-zA-Z0-9]|non[^a-zA-Z0-9]|ou[^a-zA-Z0-9]|InOut[^a-zA-Z0-9]|mod[^a-zA-Z0-9]|chaque[^a-zA-Z0-9]|dans[^a-zA-Z0-9]|decroissant[^a-zA-Z0-9]|jusque[^a-zA-Z0-9]",
             "name": "keyword.letter"
         },
         "numbers": {
@@ -22,7 +22,7 @@
             "name": "constant.numeric.decimal"
         },
         "types": {
-            "match": "entier|chaîne|caractère|booléen|réel|tableau|[A-ZÉÊÂÛÙÀÈÇÏÎ]+[a-z0-9éêâûùàèçïî]+[a-zA-Z0-9éêâûùàèçïîÏÎÉÊÂÛÙÀÈÇ_]*",
+            "match": "entier|chaine|caractere|booleen|reel|tableau|[A-Z]+[a-z0-9]+[a-zA-Z0-9_]*",
             "name": "entity.name.type.instance"
         },
         "arrow": {
@@ -50,11 +50,11 @@
             "name": "comment.block"
         },
         "constant": {
-            "match": "[A-ZÏÎÉÊÂÛÙÀÈÇ]+[A-ZÏÎÉÊÂÛÙÀÈÇ_]*",
+            "match": "[A-Z]+[A-Z_]*",
             "name": "variable.other.contants"
         },
         "function": {
-            "match": "[a-zA-ZéêâûùàèçïîÏÎÉÊÂÛÙÀÈÇ_]+\\(|\\(|\\)",
+            "match": "[a-zA-Z_]+\\(|\\(|\\)",
             "name": "entity.name.function"
         },
         "furry": {
@@ -62,7 +62,7 @@
             "name": "storage.type.function"
         },
         "blank": {
-            "match": "[a-zA-ZéêâûùàèçïîÏÎÉÊÂÛÙÀÈÇ_]+[0-9]*[^\\(]",
+            "match": "[a-zA-Z_]+[0-9]*[^\\(]",
             "name": "meta.brace.square"
         }
     }

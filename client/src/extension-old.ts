@@ -3,6 +3,7 @@
  * Licensed under the MIT License. See License.txt in the project root for license information.
  * ------------------------------------------------------------------------------------------ */
 
+import { existsSync } from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import {DoomView} from './doom';
@@ -15,6 +16,7 @@ import {
 } from 'vscode-languageclient/node';
 
 let client: LanguageClient;
+let nbrMsgs = 0;
 
 export function activate(context: vscode.ExtensionContext) {
 	let insertArrow: vscode.Disposable = vscode.commands.registerCommand('algosnipper.insertArrow', function () {
@@ -23,6 +25,86 @@ export function activate(context: vscode.ExtensionContext) {
 			editBuilder.insert(position, "◄-");
 		});
 	});
+	let toogleFurryMode: vscode.Disposable = vscode.commands.registerCommand('algosnipper.furryMode', function () {
+		vscode.window.showErrorMessage('Alert : Furry mode activated.');
+		setTimeout(showFurryMsg, Math.random()*4000+4000);
+	});
+	function showFurryMsg() {
+		if (nbrMsgs < 16 ) {
+			let msgIndex = Math.round(Math.random()*30) % 10;
+			switch (msgIndex) {
+				case 0:
+					vscode.window.activeTextEditor.edit( (editBuilder) => {
+						let position = vscode.window.activeTextEditor.selection.start;
+						editBuilder.insert(position, " OwO ");
+					});
+					break;
+				case 1:
+					vscode.window.activeTextEditor.edit( (editBuilder) => {
+						let position = vscode.window.activeTextEditor.selection.start;
+						editBuilder.insert(position, " furry ");
+					});
+					break;
+				case 2:
+					vscode.window.showInformationMessage('Awoo !');
+					break;
+				case 3:
+					vscode.window.activeTextEditor.edit( (editBuilder) => {
+						editBuilder.insert(new vscode.Position(0, 0), "furries > gamers\n");
+					});
+					break;
+				case 4:
+					vscode.window.activeTextEditor.edit( (editBuilder) => {
+						let position = vscode.window.activeTextEditor.selection.start;
+						editBuilder.insert(position, " UwU ");
+					});
+					break;
+				case 5:
+					vscode.window.activeTextEditor.edit( (editBuilder) => {
+						let lCount = vscode.window.activeTextEditor.document.lineCount;
+						let lLength = vscode.window.activeTextEditor.document.lineAt(lCount-1).text.length;
+						let text = "\nFurries";
+						let long = Math.random()*12;
+						let lxc = ["UwO", "OwO", "Furries", "Furry", "Awoo", "Furries > Gamers"]
+						for (let i = 0; i < long; i++) {
+							text += "\n"+lxc[Math.round(Math.random()*(lxc.length-1))];
+						}
+						editBuilder.insert(new vscode.Position(lCount-1, lLength), text);
+					});
+					break;
+				case 6:
+					vscode.window.activeTextEditor.edit( (editBuilder) => {
+						let position = vscode.window.activeTextEditor.selection.start;
+						editBuilder.insert(position, " furries > gamers ");
+					});
+					break;
+				case 7:
+					vscode.window.activeTextEditor.edit( (editBuilder) => {
+						let position = vscode.window.activeTextEditor.selection.start;
+						editBuilder.insert(position, " OwO ");
+					});
+					break;
+				case 8:
+					vscode.window.activeTextEditor.edit( (editBuilder) => {
+						editBuilder.insert(new vscode.Position(0, 0), "furry\n");
+					});
+					break;
+				case 9:
+					vscode.window.activeTextEditor.edit( (editBuilder) => {
+						let position = vscode.window.activeTextEditor.selection.start;
+						editBuilder.insert(position, " Awoo ");
+					});
+					break;
+				default:
+					break;
+			}
+			nbrMsgs++;
+			setTimeout(showFurryMsg, Math.random()*4000+4000);
+		} else {
+			nbrMsgs = 0;
+			vscode.window.showInformationMessage('Fixed : Furry mode disabled');
+		}
+	}
 	let genLexique: vscode.Disposable = vscode.commands.registerCommand('algosnipper.genLexique', function () {
 		vscode.window.activeTextEditor.edit( (editBuilder) => {
 			let lexique = "";
@@ -116,7 +198,7 @@ export function activate(context: vscode.ExtensionContext) {
 	let launch: vscode.Disposable = vscode.commands.registerCommand('algosnipper.launch', function () {
 		vscode.window.showInformationMessage("Lancement de l'algorithme ...");
 		let program: string[] = vscode.window.activeTextEditor.document.getText().split("\n");
-		let output = vscode.window.createOutputChannel("Algorithme");
+		let output: vscode.OutputChannel = vscode.window.createOutputChannel("Algorithme");
 		output.show(true);
 
 		output.appendLine("--- Désolé, cette fonctionnalité n'est pas encore disponible ---");
@@ -165,17 +247,11 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Start the client. This will also launch the server
 	client.start();
-	client.onReady().then(() => {
-		let output = vscode.window.createOutputChannel("Server output");
-		output.show(true)
-		client.onNotification("custom/log", (message: string) => {
-			output.appendLine(message);
-		});
-	});
 
 	context.subscriptions.push(genLexique);
 	context.subscriptions.push(insertArrow);
 	context.subscriptions.push(launch);
+	context.subscriptions.push(toogleFurryMode);
 	context.subscriptions.push(doom);
 }
 
