@@ -16,13 +16,13 @@
 
 ---
 ## Raccourcis pour programmer
-![snippet demo](https://raw.githubusercontent.com/Paulux06/AlgoSnipper/master/demo/snippets.gif)
+![snippet demo](https://raw.githubusercontent.com/FurWaz/AlgoSnipper/master/demo/snippets.gif)
 
 ## Generation automatique du lexique
-![lexicon demo](https://raw.githubusercontent.com/Paulux06/AlgoSnipper/master/demo/lexicon.gif)
+![lexicon demo](https://raw.githubusercontent.com/FurWaz/AlgoSnipper/master/demo/lexicon.gif)
 
 ## Autocompletion des variables / attributs
-![autocomplete demo](https://raw.githubusercontent.com/Paulux06/AlgoSnipper/master/demo/autocomplete.gif)
+![autocomplete demo](https://raw.githubusercontent.com/FurWaz/AlgoSnipper/master/demo/autocomplete.gif)
 
 ## Informations au survol des variables / attributs
-![hover demo](https://raw.githubusercontent.com/Paulux06/AlgoSnipper/master/demo/hover.gif)
+![hover demo](https://raw.githubusercontent.com/FurWaz/AlgoSnipper/master/demo/hover.gif)

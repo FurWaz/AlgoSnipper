@@ -3,7 +3,6 @@
 	"description": "Client part of the extension.",
 	"author": "FurWaz",
 	"license": "MIT",
-	"version": "0.0.2",
 	"publisher": "FurWaz",
 	"engines": {
 		"vscode": "^1.58.0"
