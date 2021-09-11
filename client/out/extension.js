@@ -172,19 +172,19 @@ function deactivate() {
 exports.deactivate = deactivate;
 function getVarType(value, variables) {
     if (value.startsWith('"')) { // chaîne
-        return "chaîne";
+        return "chaine";
     }
     else if (value.startsWith("'")) { // chaîne
-        return "caractère";
+        return "caractere";
     }
     else if (!isNaN(parseFloat(value))) { // nombre
         if (parseInt(value) == parseFloat(value))
             return "entier";
         else
-            return "réel";
+            return "reel";
     }
     else if (value == "vrai" || value == "faux") {
-        return "booléen";
+        return "booleen";
     }
     else {
         for (let k = 0; k < variables.length; k++) {

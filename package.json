@@ -2,7 +2,7 @@
 	"name": "algosnipper",
 	"displayName": "AlgoSnipper",
 	"description": "Support des fichier .algo pour l'IUT",
-	"version": "0.0.2",
+	"version": "0.0.4",
 	"icon": "images/logo.png",
 	"repository": {
 		"type": "git",
@@ -47,19 +47,19 @@
 		"commands": [
 			{
 				"command": "algosnipper.genLexique",
-				"title": "Generates the lexicon"
+				"title": "Generer le lexique"
 			},
 			{
 				"command": "algosnipper.launch",
-				"title": "Executes the algorithme"
+				"title": "Executer l'algorithme"
 			},
 			{
 				"command": "algosnipper.insertArrow",
-				"title": "Inserts an arrow in the code"
+				"title": "Inserer une fleche"
 			},
 			{
 				"command": "algosnipper.launchDoom",
-				"title": "Starts doom"
+				"title": "Lancer DOOM"
 			}
 		],
 		"snippets": [

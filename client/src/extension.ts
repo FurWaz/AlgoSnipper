@@ -115,7 +115,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 	let launch: vscode.Disposable = vscode.commands.registerCommand('algosnipper.launch', function () {
 		vscode.window.showInformationMessage("Lancement de l'algorithme ...");
-		let program: string[] = vscode.window.activeTextEditor.document.getText().split("\n");
+		let program = vscode.window.activeTextEditor.document.getText().split("\n");
 		let output = vscode.window.createOutputChannel("Algorithme");
 		output.show(true);
 
@@ -188,19 +188,19 @@ export function deactivate(): Thenable<void> | undefined {
 
 function getVarType(value: string, variables: {name: string, type: string}[]): string {
 	if (value.startsWith('"')) { // chaîne
-		return "chaîne";
+		return "chaine";
 	}
 	else if (value.startsWith("'")) { // chaîne
-		return "caractère";
+		return "caractere";
 	}
 	else if (!isNaN(parseFloat(value))) { // nombre
 		if (parseInt(value) == parseFloat(value))
 			return "entier";
 		else
-			return "réel";
+			return "reel";
 	}
 	else if (value == "vrai" || value == "faux") {
-		return "booléen";
+		return "booleen";
 	}
 	else {
 		for (let k = 0; k < variables.length; k++) {

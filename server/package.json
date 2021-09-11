@@ -1,7 +1,7 @@
 {
 	"name": "algosnipper-server",
 	"description": "Server part of the extension.",
-	"version": "0.0.1",
+	"version": "0.0.4",
 	"author": "FurWaz",
 	"license": "MIT",
 	"engines": {
