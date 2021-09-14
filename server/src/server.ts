@@ -21,14 +21,8 @@ import {
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 
-import {
-	Attribute,
-	getWordRange,
-	Interpreter,
-	Type,
-	Variable,
-	Range
-} from './interpreter';
+import { Attribute, Type, Range, getWordRange, Analyzer } from './analyzer';
+import { debug } from 'console';
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
 let connection = createConnection(ProposedFeatures.all);
@@ -104,14 +98,26 @@ documents.onDidClose(e => {
 // when the text document first opened or when its content has changed.
 documents.onDidChangeContent(async change => {
 	let textDocument = change.document;
-	Interpreter.setDocument(textDocument.getText().split("\n"));
+	Analyzer.setDocument(textDocument.getText().split("\n"));
 	validateTextDocument(textDocument);
 });
 
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
-	Interpreter.processLexiconInfos();
+	Analyzer.processLexiconInfos();
+	Analyzer.processScriptInfo(println);
 	let diagnostics: Diagnostic[] = [];
-	Interpreter.LexiconErrors.forEach(e => {
+	Analyzer.LexiconErrors.forEach(e => {
+		diagnostics.push({
+			severity: DiagnosticSeverity.Error,
+			range: {
+				start: Position.create(e.line, e.range.start),
+				end: Position.create(e.line, e.range.end)
+			},
+			message: e.message,
+			source: "AlgoSnipper"
+		});
+	});
+	Analyzer.scriptErrors.forEach(e => {
 		diagnostics.push({
 			severity: DiagnosticSeverity.Error,
 			range: {
@@ -138,11 +144,15 @@ connection.onCompletion(
 		let compList: CompletionItem[] = [];
 
 		// is the completion global or for variable attributes
-		if (Interpreter.document[docPos.position.line][docPos.position.character-1] == ".") {
+		let isAttribute = false;
+		let range = getWordRange(docPos.position.character-1, Analyzer.document[docPos.position.line]);
+		if (range != undefined)
+			isAttribute = Analyzer.document[docPos.position.line][range.start-1] == ".";
+		if (isAttribute) {
 			let range = new Range(docPos.position.character-2, docPos.position.character-1);
-			while (Interpreter.document[docPos.position.line][range.start].match(/[a-zA-Z0-9_\\.]/))
+			while (Analyzer.document[docPos.position.line][range.start].match(/[a-zA-Z0-9_\\.]/))
 				range.start--;
-			let path = Interpreter.document[docPos.position.line].substring(range.start, range.end).trim().split(".");
+			let path = Analyzer.document[docPos.position.line].substring(range.start, range.end).trim().split(".");
 			let type = new Type();
 			for (let i = 0; i < path.length; i++) {
 				const t_name = path[i];
@@ -166,14 +176,14 @@ connection.onCompletion(
 			});
 		} else {
 			let index = 0;
-			Interpreter.lexiconTypes.forEach(t => {
+			Analyzer.lexiconTypes.forEach(t => {
 				compList.push({
 					label: t.name,
 					kind: CompletionItemKind.Class,
 					data: {index: index++, type: t}
 				});
 			});
-			Interpreter.defaultTypes.forEach(t => {
+			Analyzer.defaultTypes.forEach(t => {
 				compList.push({
 					label: t.name,
 					kind: CompletionItemKind.Class,
@@ -181,7 +191,14 @@ connection.onCompletion(
 				});
 			});
 			index = 0;
-			Interpreter.lexiconAttrs.forEach(v => {
+			Analyzer.lexiconAttrs.forEach(v => {
+				compList.push({
+					label: v.name,
+					kind: CompletionItemKind.Variable,
+					data: {index: index++}
+				});
+			});
+			Analyzer.scriptAttrs.forEach(v => {
 				compList.push({
 					label: v.name,
 					kind: CompletionItemKind.Variable,
@@ -203,7 +220,10 @@ connection.onCompletionResolve(
 			item.documentation = { kind: MarkupKind.Markdown, value: Type.GenerateDoc(type) };
 		}
 		if (item.kind == CompletionItemKind.Variable) {
-			let attr = Interpreter.lexiconAttrs[item.data.index];
+			let attr: Attribute;
+			if (item.data.index < Analyzer.lexiconAttrs.length)
+				attr = Analyzer.lexiconAttrs[item.data.index];
+			else attr = Analyzer.scriptAttrs[item.data.index - Analyzer.lexiconAttrs.length];
 			item.detail = "Variable "+attr.name;
 			item.documentation = { kind: MarkupKind.Markdown, value: Attribute.GenerateDoc(attr, true) };
 		}
@@ -224,7 +244,6 @@ connection.onHover(({ textDocument, position }): Hover | undefined => {
 	let range = getWordRange(position.character, document.getText().split("\n")[position.line]);
 	if (range == undefined)
 		return undefined;
-
 	let vName = document.getText({
 		start: {line: position.line, character: range.start},
 		end: {line: position.line, character: range.end}
@@ -255,7 +274,6 @@ connection.onHover(({ textDocument, position }): Hover | undefined => {
 			start: {line: position.line, character: pathRange.start},
 			end: {line: position.line, character: pathRange.end}
 		}).trim().split(".");
-		println("Got path: "+path.join("."));
 		let tp = new Attribute();
 		for (let i = 0; i < path.length; i++) {
 			const t_name = path[i];
@@ -281,9 +299,18 @@ connection.onHover(({ textDocument, position }): Hover | undefined => {
     return undefined;
 });
 
+connection.onNotification("custom/getScriptInfo", () => {
+	connection.sendNotification("custom/setScriptInfo", {
+		attrs: Analyzer.scriptAttrs,
+		types: Analyzer.scriptTypes,
+		bounds: Analyzer.lexiconBounds
+	});
+});
+
 function println(str: string) {
 	connection.sendNotification("custom/log", str);
 }
+Analyzer.debug = println;
 
 // Make the text document manager listen on the connection
 // for open, change and close text document events

@@ -6,7 +6,6 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 import {DoomView} from './doom';
-
 import {
 	LanguageClient,
 	LanguageClientOptions,
@@ -24,94 +23,7 @@ export function activate(context: vscode.ExtensionContext) {
 		});
 	});
 	let genLexique: vscode.Disposable = vscode.commands.registerCommand('algosnipper.genLexique', function () {
-		vscode.window.activeTextEditor.edit( (editBuilder) => {
-			let lexique = "";
-			let newLexique = true;
-			let count: number = vscode.window.activeTextEditor.document.lineCount;
-			// check is lexicon already exists
-			for (let i = 0; i < count; i++) {
-				let line = vscode.window.activeTextEditor.document.lineAt(i);
-				if (line.text.trim().toLocaleLowerCase().startsWith("lexique")) {
-					newLexique = false;
-					count = i-1;
-				}
-			}
-			if (newLexique) lexique += "\n\nlexique:";
-			// get all the variables from the script
-			let variables: {name: string, type: string}[] = [];
-			for (let i = 0; i < count; i++) {
-				const line = vscode.window.activeTextEditor.document.lineAt(i);
-				if (line.text.trim().startsWith("fonction")) { // fonction declaration
-					let deb = 0;
-					let fin = 0;
-					for (let i = 0; i < line.text.length; i++) {
-						let cur_char = line.text.charAt(i);
-						if (cur_char=="(" && deb==0) deb = i;
-						if (cur_char==")") fin = i;
-					}
-					let args: string|string[] = line.text.substring(deb+1, fin-1).trim();
-					if (args.length > 0) {
-						args = args.split(",");
-						for (let i = 0; i < args.length; i++) {
-							const arg = args[i];
-							let parts = arg.trim().split(":");
-							if (parts.length > 1)
-								variables.push({name: parts[0].replace("InOut", "").trim(), type: parts[1].trim()});
-						}
-					}
-				} else {
-					let words = line.text.split(" ");
-					for (let j = 0; j < words.length; j++) {
-						const w = words[j];
-						if (w == "◄-" || w == "←" || w == "<-" || w == "<=") {
-							let alreadyExists = false
-							for (let k = 0; k < variables.length; k++) {
-								if (variables[k].name.trim() == words[j-1].trim()) 
-									alreadyExists = true;
-							}
-							if (!alreadyExists)
-								variables.push({name: words[j-1], type: getVarType(words[j+1], variables)});
-						}
-					}
-				}
-			}
-			// store already existing variables from lexique
-			let existing_variables: {name: string, type: string}[] = [];
-			for (let i = count+2; i < vscode.window.activeTextEditor.document.lineCount; i++) {
-				const line = vscode.window.activeTextEditor.document.lineAt(i).text.trim();
-				let parts = line.split(":");
-				if (parts.length > 1) { // variable declaration
-					let name = parts[0].trim();
-					let type = parts[1].trim()
-					let cutPos = type.length;
-					for (let i = 0; i < type.length-1; i++) {
-						if (type.charAt(i) == "/" && (type.charAt(i+1) == "*"||type.charAt(i+1) == "/")) {
-							cutPos = i;
-						}
-					}
-					type = type.substr(0, cutPos).trim();
-					existing_variables.push({name: name, type: type});
-				} else {
-					parts = line.split("=")
-					if (parts.length > 1) { // type declaration
-
-					}
-				}
-			}
-
-			// adds the variables to the lexicon
-			for (let i = 0; i < variables.length; i++) {
-				const v = variables[i];
-				let exists = false;
-				for (let i = 0; i < existing_variables.length; i++) {
-					const ex_var = existing_variables[i];
-					if (ex_var.name == v.name) exists = true;
-				}
-				if (!exists) lexique += "\n    "+v.name+" : "+v.type+" // commentaire"
-			}
-			editBuilder.insert(new vscode.Position(vscode.window.activeTextEditor.document.lineCount, 0), lexique);
-		});
-		vscode.window.showInformationMessage('Le lexique à bien été généré !');
+		client.sendNotification("custom/getScriptInfo");
 	});
 	let launch: vscode.Disposable = vscode.commands.registerCommand('algosnipper.launch', function () {
 		vscode.window.showInformationMessage("Lancement de l'algorithme ...");
@@ -171,6 +83,10 @@ export function activate(context: vscode.ExtensionContext) {
 		client.onNotification("custom/log", (message: string) => {
 			output.appendLine(message);
 		});
+
+		client.onNotification("custom/setScriptInfo", (data) => {
+			generateLexique(data);
+		});
 	});
 
 	context.subscriptions.push(genLexique);
@@ -179,66 +95,34 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(doom);
 }
 
+function generateLexique(data: any) {
+	vscode.window.activeTextEditor.edit( (editBuilder) => {
+		let lexique = "lexique:\n";
+		let attrs = data.attrs;
+		let types = data.types;
+		let bounds = data.bounds;
+		types.forEach(t => {
+			let attributes = "<";
+			t.attrs.forEach(a => {
+				let empty = true;
+				a.name.split("").forEach(l=>{if(l!="_")empty=false;});
+				if (empty) a.name = "a"+a.name.length;
+				attributes += a.name+": "+a.type.name+", ";
+			});
+			attributes = attributes.substring(0, attributes.length-2)+">";
+			lexique += "    "+t.name+" = "+attributes+" // description\n";
+		});
+		attrs.forEach(a => {
+			lexique += "    "+a.name+": "+a.type.name+" // description\n";
+		});
+		editBuilder.insert(new vscode.Position(vscode.window.activeTextEditor.document.lineCount, 0), lexique);
+	});
+	vscode.window.showInformationMessage('Le lexique à bien été généré !');
+}
+
 export function deactivate(): Thenable<void> | undefined {
 	if (!client) {
 		return undefined;
 	}
 	return client.stop();
-}
-
-function getVarType(value: string, variables: {name: string, type: string}[]): string {
-	if (value.startsWith('"')) { // chaîne
-		return "chaine";
-	}
-	else if (value.startsWith("'")) { // chaîne
-		return "caractere";
-	}
-	else if (!isNaN(parseFloat(value))) { // nombre
-		if (parseInt(value) == parseFloat(value))
-			return "entier";
-		else
-			return "reel";
-	}
-	else if (value == "vrai" || value == "faux") {
-		return "booleen";
-	}
-	else {
-		for (let k = 0; k < variables.length; k++) {
-			const v = variables[k].name;
-			if (v.trim() == value.trim()) {
-				return variables[k].type;
-			}
-		}
-		return "Inconnu";
-	}
-}
-
-function getVarValue(line: string, variables: {name: string, type: string, value: string}[]): string {
-	let splitted: string[] = line.split(" ");
-	let value: string = "";
-	for (let i = 0; i < splitted.length; i++) {
-		if (splitted[i] == "←") {
-			for (let k = 0; k < variables.length; k++) {
-				const v = variables[k].name;
-				if (v.trim() == splitted[i+1].trim()) {
-					value = variables[k].value;
-					break;
-				}
-			}
-			break;
-		}
-	}
-	if (value == "") {
-		for (let i = 0; i < splitted.length; i++) {
-			if (splitted[i] == "←") {
-				for (let j = i+1; j < splitted.length; j++) {
-					value += splitted[j]+" ";
-				}
-			}
-		}
-		if (value.startsWith('"')) {
-			value = value.substr(1, value.length-4)
-		}
-	}
-	return value;
 }
