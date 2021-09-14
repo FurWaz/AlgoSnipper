@@ -71,7 +71,7 @@ documents.onDidChangeContent(async (change) => {
 });
 async function validateTextDocument(textDocument) {
     analyzer_1.Analyzer.processLexiconInfos();
-    analyzer_1.Analyzer.processScriptInfo(println);
+    analyzer_1.Analyzer.processScriptInfo();
     let diagnostics = [];
     analyzer_1.Analyzer.LexiconErrors.forEach(e => {
         diagnostics.push({

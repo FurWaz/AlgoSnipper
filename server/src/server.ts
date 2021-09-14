@@ -104,7 +104,7 @@ documents.onDidChangeContent(async change => {
 
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 	Analyzer.processLexiconInfos();
-	Analyzer.processScriptInfo(println);
+	Analyzer.processScriptInfo();
 	let diagnostics: Diagnostic[] = [];
 	Analyzer.LexiconErrors.forEach(e => {
 		diagnostics.push({

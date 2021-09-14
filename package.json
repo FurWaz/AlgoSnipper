@@ -2,7 +2,7 @@
 	"name": "algosnipper",
 	"displayName": "AlgoSnipper",
 	"description": "Support des fichier .algo pour l'IUT",
-	"version": "0.0.5",
+	"version": "0.0.6",
 	"icon": "images/logo.png",
 	"repository": {
 		"type": "git",

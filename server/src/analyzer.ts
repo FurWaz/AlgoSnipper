@@ -54,8 +54,8 @@ export class Attribute {
 
     public canFitIn(attr: Attribute, indices: number[], underscoreIndex: number): boolean {
         let empty = true;
-        Analyzer.debug(((underscoreIndex <= 0)? "checking name": "not checking names")+" : "+underscoreIndex);  
-        attr.name.split("").forEach(l=>{Analyzer.debug("checking: "+l);if(l!='_')empty=false;});
+        attr.name.split("").forEach(l=>{if(l!='_')empty=false;});
+        if (attr.name == this.name) empty = true;
         if (!empty && underscoreIndex <= 0) return false;
         if (attr.type.code != this.type.code)
             return false;
@@ -64,12 +64,11 @@ export class Attribute {
             for (let i = 0; i < this.type.attrs.length; i++) {
                 const at = this.type.attrs[i];
                 let found = false;
-                for (let i = 0; i < attribs.length; i++)
-                    Analyzer.debug("launch");
-                    if (at.canFitIn(attribs[i], indices, underscoreIndex-1)) {
+                for (let j = 0; j < attribs.length; j++)
+                    if (at.canFitIn(attribs[j], indices, underscoreIndex-1)) {
                         found = true;
-                        indices.push(attr.type.attrs.indexOf(attribs[i]));
-                        attribs.splice(i, 1);
+                        indices.push(attr.type.attrs.indexOf(attribs[j]));
+                        attribs.splice(j, 1);
                         break;
                     }
                 if (!found)
@@ -150,8 +149,6 @@ export class Type {
 
     public static DetermineValueType(str: string): Type {
         // is couple of values
-        Analyzer.debug("Determining variable type: "+str);
-        Analyzer.debug("Trying couple ...");
         let mtch = str.match(/\(.*\)/); // TODO change composite detection
         if (mtch) {
             let parts = mtch[0].substring(1, mtch[0].length-1).split(",");
@@ -169,18 +166,31 @@ export class Type {
                 let subtype = this.DetermineValueType(pt.trim());
                 if (compositeType) {
                     subtype.name = "Type"+(Analyzer.scriptTypes.length+1);
-                    Analyzer.scriptTypes.push(subtype);
+                    let found = false;
+                    Analyzer.lexiconTypes.concat(Analyzer.scriptTypes).forEach(t => {
+                        if (subtype.equals(t)) {
+                            subtype = t;
+                            found = true;
+                        }
+                    });
+                    if (!found) // no matching type detected, this is a new type
+                        Analyzer.scriptTypes.push(subtype);
                 }
                 let name = "";
                 for (let i = 0; i < index; i++) name += "_";
                 attrs.push(new Attribute(name, subtype));
                 index++;
             };
-            return new Type("", attrs, "// Type inconnu");
+            let foundType = new Type("", attrs, "// Type inconnu");
+            Analyzer.lexiconTypes.concat(Analyzer.scriptTypes).forEach(t => {
+                if (foundType.equals(t)) {
+                    foundType = t;
+                }
+            });
+            return new Type(foundType.name, foundType.attrs, foundType.desc);
         }
 
         // default types
-        Analyzer.debug("Trying default types ...");
         if (str.startsWith('"') && str.endsWith('"'))
             return new Type("chaine");
         if (str.startsWith("'") && str.endsWith("'") && str.length == 3)
@@ -193,19 +203,15 @@ export class Type {
             return new Type("reel");
 
         // get type from variable name
-        Analyzer.debug("Trying attribute types ...");
         let type = new Type();
         Analyzer.lexiconAttrs.forEach(at => {
-            Analyzer.debug(" - lexicon attribute "+at.name+": "+(str == at.name));
             if (str == at.name)
                 type = at.type;
         });
         Analyzer.scriptAttrs.forEach(at => {
-            Analyzer.debug(" - script attribute "+at.name+": "+(str == at.name));
             if (str == at.name)
                 type = at.type;
         });
-        Analyzer.debug("Return");
         return type;
     }
 
@@ -213,7 +219,7 @@ export class Type {
         let res = new Type();
         let code = Type.String2Code(str);
         if (code == Type.COMPOSITE)
-            Analyzer.lexiconTypes.forEach(t => {
+            Analyzer.lexiconTypes.concat(Analyzer.scriptTypes).forEach(t => {
                 if (t.name == str)
                     res = t;
             });
@@ -243,7 +249,7 @@ export class Type {
         }
         if (!found) {
             let matchingType: Type = new Type();
-            Analyzer.lexiconTypes.forEach(t => {
+            Analyzer.lexiconTypes.concat(Analyzer.scriptTypes).forEach(t => {
                 if (t.name == str) {
                     matchingType = t;
                 }
@@ -285,30 +291,6 @@ export class Type {
                 default: break;
             }
         }
-    }
-}
-
-export class Variable {
-    public name: string;
-    public desc: string;
-    public type: Type;
-    public value: number | boolean | string | Variable[];
-
-    public static isNull(v: Variable): boolean {
-        return v.name == "";
-    }
-
-    public static FromString(str: string): Variable {
-        let res = new Variable();
-        // TODO
-        return res;
-    }
-
-    public constructor(name: string = "Inconnu", type: Type = new Type(), desc: string = "", value: number | boolean | string | Variable[] = []) {
-        this.name = name;
-        this.desc = desc;
-        this.value = value;
-        this.type = type;
     }
 }
 
@@ -463,11 +445,10 @@ export class Analyzer {
         }
     }
 
-    public static processScriptInfo(debug: any) {
+    public static processScriptInfo() {
         this.scriptAttrs = [];
         this.scriptTypes = [];
         this.scriptErrors = [];
-        debug("===========================================")
         for (let i = 0; i < this.document.length; i++) {
             const line = this.document[i];
             let isMatch = line.match(this.SCRIPT_STORE_REGEX);
@@ -477,7 +458,7 @@ export class Analyzer {
                 let vValue = parts[1].trim();
                 let vType = Type.DetermineValueType(vValue);
                 if (vType.code == Type.UNKNOWN) { // look in scriptTypes for matching types
-                    this.scriptTypes.forEach(t => {
+                    this.scriptTypes.concat(this.lexiconTypes).forEach(t => {
                         if (t.equals(vType)) vType == t;
                     });
                 }
@@ -487,9 +468,7 @@ export class Analyzer {
                     this.scriptTypes.push(vType);
                 }
                 let list = this.lexiconAttrs.concat(this.scriptAttrs);
-                debug("Checking for "+vName[0]);
                 if (vName.length < 2) { // not dot in variable name, not an attribute
-                    debug("  -> Simple variable");
                     let isInList = false;
                     list.forEach(e => {
                         if (vName[0] == e.name) {
@@ -505,21 +484,18 @@ export class Analyzer {
                     });
                     if (!isInList) this.scriptAttrs.push(new Attribute(vName[0], vType, ""));
                 } else { // composite variable
-                    debug("  -> composite variable");
                     let attr = new Attribute();
                     this.lexiconAttrs.forEach(a => { // check if variable is in lexicon
                         if (a.name == vName[0])
                             attr = a;
                     });
                     if (Attribute.isNull(attr)) { // doesn't exists in lexicon
-                        debug("  -> Not in lexicon");
                         let newAttr = new Attribute();
                         this.scriptAttrs.forEach(a => { // check if exists in script
                             if (a.name == vName[0])
                                 newAttr = a;
                         });
                         if (!Attribute.isNull(newAttr)) { // is already declared in script
-                            debug("  -> declared in script");
                             let index = 0;
                             while (++index < vName.length) { // go to the end of the variable attributes' list
                                 let found = false;
@@ -531,35 +507,31 @@ export class Analyzer {
                                 });
                                 if (!found) break;
                             }
-                            debug("Path stopped to index "+index+" and attr name "+vName[index]);
                             // TODO: check if an empty variable's attribute of the type of the new written attribute is available
                             // before saying that the wrotten attribute is renaming anything /!\
                             if (index < vName.length) { // variable attribute renaming
                                 let xedni = vName.length-1;
                                 let lastAttr = new Attribute(vName[xedni], vType, "");
                                 while (xedni-- >= index) { // requires variable type reconstruction for type checking
-                                    Analyzer.debug("Adding "+lastAttr.name+" to "+vName[xedni]);
                                     let type = new Type("composite", [lastAttr], "");
                                     lastAttr = new Attribute(vName[xedni], type, "");
                                 }
                                 let tab: number[] = [];
-                                Analyzer.debug("index = "+index);
-                                Analyzer.debug(lastAttr.name+" vs "+newAttr.name);
-                                if (!lastAttr.canFitIn(newAttr, tab, index)) // attribute can't exist
-                                    this.scriptErrors.push(
-                                        new ScriptError(
-                                            "L'attribut "+vName[vName.length-1]+" n'existe pas",
-                                            i, new Range(0, line.length)
-                                        )
-                                    );
+                                if (!lastAttr.canFitIn(newAttr, tab, vName.length-index)) // attribute can't exist
+                                    {
+                                        this.scriptErrors.push(
+                                            new ScriptError(
+                                                "L'attribut "+vName[vName.length-1]+" n'existe pas",
+                                                i, new Range(0, line.length)
+                                            )
+                                        );
+                                    }
                                 else {
                                     let curAttr = newAttr;
                                     tab = tab.reverse();
                                     for (let j = 0; j < tab.length; j++) {
-                                        Analyzer.debug("INDEX: "+j+" OUT OF "+tab.length);
                                         lastAttr = lastAttr.type.attrs[0];
                                         const tab_j = tab[j];
-                                        Analyzer.debug("attrs: "+curAttr.type.attrs.length+" vs "+tab_j+" - "+curAttr.name+" to "+lastAttr.name);
                                         curAttr.type.attrs[tab_j].name = lastAttr.name;
                                         curAttr = curAttr.type.attrs[tab_j];
                                     };
@@ -582,12 +554,11 @@ export class Analyzer {
                                     );
                             }
                         } else { // not declared in script
-                            debug("  -> not declared in script");
                             let lastAttr = new Attribute(vName[vName.length-1], vType, "");
                             for (let j = vName.length-2; j >= 0; j--) {
                                 let type = new Type("Type"+(this.scriptTypes.length+1), [lastAttr], "");
                                 let found = false;
-                                this.scriptTypes.forEach(t => {
+                                this.scriptTypes.concat(this.lexiconTypes).forEach(t => {
                                     if (t.equals(type)) {
                                         type = t;
                                         found = true;
@@ -600,7 +571,6 @@ export class Analyzer {
                             this.scriptAttrs.push(newAttr);
                         }
                     } else { // variable is in lexicon (just a type verification)
-                        debug("  -> is in lexicon");
                         // go to the last attribute
                         for (let j = 1; j < vName.length; j++) {
                             let found = false;
