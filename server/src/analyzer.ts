@@ -148,6 +148,10 @@ export class Type {
     }
 
     public static DetermineValueType(str: string): Type {
+        let isOperation = false;
+        str.split(" ").forEach(l=>{isOperation||=l.match(Analyzer.SCRIPT_OPERATORS_REGEX)!=null;});
+        if (isOperation) return Analyzer.getOperationType(str);
+
         // fonction call, get function return value
         if (str.match(/^ *[a-zA-Z0-9]+\(.*\) *$/)) {
             str = str.trim()
@@ -336,6 +340,37 @@ export class ScriptError {
     }
 }
 
+const opsDic: {type1: number, op: string, type2: number, res: number}[] = [
+    // entier
+    {type1: Type.ENTIER, op: "+", type2: Type.ENTIER, res: Type.ENTIER}, {type1: Type.ENTIER, op: "-", type2: Type.ENTIER, res: Type.ENTIER},
+    {type1: Type.ENTIER, op: "/", type2: Type.ENTIER, res: Type.ENTIER}, {type1: Type.ENTIER, op: "*", type2: Type.ENTIER, res: Type.ENTIER},
+    {type1: Type.ENTIER, op: "<", type2: Type.ENTIER, res: Type.BOOLEEN}, {type1: Type.ENTIER, op: ">", type2: Type.ENTIER, res: Type.BOOLEEN},
+    {type1: Type.ENTIER, op: "<=", type2: Type.ENTIER, res: Type.BOOLEEN}, {type1: Type.ENTIER, op: ">=", type2: Type.ENTIER, res: Type.BOOLEEN},
+    {type1: Type.ENTIER, op: "+", type2: Type.REEL, res: Type.REEL}, {type1: Type.ENTIER, op: "-", type2: Type.REEL, res: Type.REEL},
+    {type1: Type.ENTIER, op: "/", type2: Type.REEL, res: Type.REEL}, {type1: Type.ENTIER, op: "*", type2: Type.REEL, res: Type.REEL},
+    {type1: Type.ENTIER, op: "<", type2: Type.REEL, res: Type.BOOLEEN}, {type1: Type.ENTIER, op: ">", type2: Type.REEL, res: Type.BOOLEEN},
+    {type1: Type.ENTIER, op: "<=", type2: Type.REEL, res: Type.BOOLEEN}, {type1: Type.ENTIER, op: ">=", type2: Type.REEL, res: Type.BOOLEEN},
+    {type1: Type.ENTIER, op: "=", type2: Type.ENTIER, res: Type.BOOLEEN}, {type1: Type.ENTIER, op: "=", type2: Type.REEL, res: Type.BOOLEEN},
+    {type1: Type.ENTIER, op: "%", type2: Type.ENTIER, res: Type.ENTIER},
+    // reel
+    {type1: Type.REEL, op: "+", type2: Type.REEL, res: Type.REEL}, {type1: Type.REEL, op: "-", type2: Type.REEL, res: Type.REEL},
+    {type1: Type.REEL, op: "/", type2: Type.REEL, res: Type.REEL}, {type1: Type.REEL, op: "*", type2: Type.REEL, res: Type.REEL},
+    {type1: Type.REEL, op: "+", type2: Type.ENTIER, res: Type.REEL}, {type1: Type.REEL, op: "-", type2: Type.ENTIER, res: Type.REEL},
+    {type1: Type.REEL, op: "/", type2: Type.ENTIER, res: Type.REEL}, {type1: Type.REEL, op: "*", type2: Type.ENTIER, res: Type.REEL},
+    {type1: Type.REEL, op: "<", type2: Type.REEL, res: Type.BOOLEEN}, {type1: Type.REEL, op: ">", type2: Type.REEL, res: Type.BOOLEEN},
+    {type1: Type.REEL, op: "<=", type2: Type.REEL, res: Type.BOOLEEN}, {type1: Type.REEL, op: ">=", type2: Type.REEL, res: Type.BOOLEEN},
+    {type1: Type.REEL, op: "<", type2: Type.ENTIER, res: Type.BOOLEEN}, {type1: Type.REEL, op: ">", type2: Type.ENTIER, res: Type.BOOLEEN},
+    {type1: Type.REEL, op: "<=", type2: Type.ENTIER, res: Type.BOOLEEN}, {type1: Type.REEL, op: ">=", type2: Type.ENTIER, res: Type.BOOLEEN},
+    {type1: Type.REEL, op: "=", type2: Type.REEL, res: Type.BOOLEEN}, {type1: Type.REEL, op: "=", type2: Type.ENTIER, res: Type.BOOLEEN},
+    {type1: Type.ENTIER, op: "%", type2: Type.ENTIER, res: Type.ENTIER},
+    // chaine | caractere
+    {type1: Type.CHAINE, op: "+", type2: Type.CHAINE, res: Type.CHAINE}, {type1: Type.CHAINE, op: "=", type2: Type.CHAINE, res: Type.BOOLEEN}, 
+    {type1: Type.CARACTERE, op: "+", type2: Type.CARACTERE, res: Type.CHAINE}, {type1: Type.CARACTERE, op: "=", type2: Type.CARACTERE, res: Type.BOOLEEN},
+    // booleen
+    {type1: Type.BOOLEEN, op: "et", type2: Type.BOOLEEN, res: Type.BOOLEEN}, {type1: Type.BOOLEEN, op: "ou", type2: Type.BOOLEEN, res: Type.BOOLEEN},
+    {type1: Type.BOOLEEN, op: "=", type2: Type.BOOLEEN, res: Type.BOOLEEN}
+];
+
 export class Analyzer {
     public static scriptAttrs: Attribute[] = [];
     public static scriptTypes: Type[] = [];
@@ -347,6 +382,7 @@ export class Analyzer {
     public static lexiconBounds = new Range(-1, -1);
     public static document: string[] = [];
     public static debug:any=(str:string)=>{};
+    public static currentLine: number = 0;
 
     public static defaultTypes = [
         new Type("reel"),
@@ -358,11 +394,86 @@ export class Analyzer {
 
     public static LEXICON_VAR_REGEX = / *[a-zA-Z][a-zA-Z0-9]* *: *[a-zA-Z][a-zA-Z0-9]* *(\/\/.*)*$/;
     public static LEXICON_TYPE_REGEX = /^ *[a-zA-Z][a-zA-Z0-9]* *= *< *([a-z][a-zA-Z0-9]*) *: *([a-zA-Z0-9]+ *)(, *([a-z][a-zA-Z0-9]*) *: *([a-zA-Z0-9]+) *)*> *(\/\/.*)*$/;
-    public static SCRIPT_STORE_REGEX = /[^\s]+ *<-.*[^\s]+/;
+    public static SCRIPT_STORE_REGEX = /[^\s]+.*<-.*[^\s]+/;
     public static SCRIPT_FUNC_REGEX = /^(fonction) *[a-zA-Z0-9]+ *\(.*\)( *: *[a-zA-Z0-9]+ *)?$/;
+    public static SCRIPT_OPERATORS_REGEX = /(\+|-|\/|%|\*|<=|>=|=|<|>|\^|et|ou)/;
 
     public static setDocument(document: string[]) {
         this.document = document;
+    }
+    
+    public static getOperationType(str: string, sub: boolean = false): Type {
+        let str2op = (str: string): number => { // converts string operator to operator priority
+            switch (str) {
+                case "et": return 1; case "ou": return 2;
+                case "<=": case ">=": case "<": case ">": return 3;
+                case "+": case "-": return 4;
+                case "%": return 5;
+                case "*": case "/": return 6;
+                default: return 0;
+            }
+        };
+        let getOpResult = (ob1: string, op: string, ob2: string): string => { // returns a string defining the return type
+            let t1 = Type.DetermineValueType(ob1);
+            let t2 = Type.DetermineValueType(ob2);
+            let res = "";
+            opsDic.forEach(opd => {
+                if (t1.code == opd.type1 && t2.code == opd.type2 && op == opd.op) {
+                    switch (opd.res) {
+                        case Type.ENTIER: res = "0"; break;
+                        case Type.REEL: res = "0.0"; break;
+                        case Type.CARACTERE: res = "''"; break;
+                        case Type.CHAINE: res = "\"\""; break;
+                        case Type.BOOLEEN: res = "vrai"; break;
+                    }
+                }
+            });
+            if (res == "")
+                Analyzer.scriptErrors.push(
+                    new ScriptError(
+                        "Operation ["+op+"] impossible entre les type ["+t1.name+"] et ["+t2.name+"]",
+                        Analyzer.currentLine, new Range(0, Analyzer.document[Analyzer.currentLine].length)
+                    )
+                );
+            return res;
+        };
+        let lastPos = 0;
+        let cursor = 0;
+        let operations: {str: string, op: string}[] = [];
+        // parse the string to get operations
+        while (cursor < str.length) {
+            if (str[cursor].match(/(\+|-|\/|%|\*|=|<|>|\^)/)) {
+                operations.push({str: str.substring(lastPos, cursor).trim(), op: str[cursor]});
+                lastPos = cursor+1;
+            } else if (str.substr(cursor, 2).match(/(<=|>=|et|ou)/)) {
+                operations.push({str: str.substring(lastPos, cursor).trim(), op: str.substr(cursor, 2)});
+                lastPos = cursor+2;
+            }
+            cursor++;
+        }
+        operations.push({str: str.substring(lastPos, cursor).trim(), op: ""});
+        // go through the operations
+        let index = 0;
+        while (operations.length > 1) { // stop when only one object in the list (the result)
+            Analyzer.debug("new loop");
+            const cur_ob = operations[index];
+            const next_ob = operations[index+1];
+            Analyzer.debug("cur="+cur_ob.str+", next="+next_ob.str);
+            if (str2op(cur_ob.op) < str2op(next_ob.op)) { // if the next operation is higher, execute it before
+                index++;
+            } else { // execute the operation and store the result
+                cur_ob.str = getOpResult(cur_ob.str, cur_ob.op, next_ob.str);
+                cur_ob.op = next_ob.op;
+                operations.splice(index+1, 1);
+                if (index > 0) index--;
+            }
+            Analyzer.debug("----")
+            operations.forEach(op => {Analyzer.debug(op.str + " " + op.op);});
+            Analyzer.debug("index="+index+", length="+operations.length);
+        }
+        let type = Type.DetermineValueType(operations[0].str);
+        Analyzer.debug("Type = "+type.name);
+        return type;
     }
 
     public static cleanUp() {
@@ -402,6 +513,7 @@ export class Analyzer {
 
         // get the lexicon types
         for (let i = lexiconStart; i < lexiconEnd; i++) {
+            this.currentLine = i;
             const line = this.document[i];
             if (!line.trim().match(this.LEXICON_TYPE_REGEX))
                 continue;
@@ -487,9 +599,9 @@ export class Analyzer {
 
     public static processScriptFunctions() {
         for (let i = 0; i < this.document.length; i++) {
+            this.currentLine = i;
             const line = this.document[i].trim();
-            if (!line.match(this.SCRIPT_FUNC_REGEX)) continue
-            Analyzer.debug("line matching: "+line);
+            if (!line.match(this.SCRIPT_FUNC_REGEX)) continue;
             let chunk = line.substring(9, line.length) // remove "fonction" from line
             let parts = chunk.split(/[\(|\)]/);
             if (parts.length < 3)
@@ -508,22 +620,20 @@ export class Analyzer {
                         );
                         return;
                     }
-                    Analyzer.debug("new attribute: "+attr[0].trim()+" of type "+attr[1].trim());
                     args.push(new Attribute(attr[0].trim(), Type.FromString(attr[1].trim()), ""));
                 });
             }
             let rt = parts[2].trim();
             rt = rt.substring(1, rt.length).trim();
             let rtype = (rt.length < 1)? new Type("Inconnu"): Type.FromString(rt);
-            Analyzer.debug("type: "+rtype.name);
             let func = new Func(parts[0].trim(), args, rtype);
-            Analyzer.debug("Adding new function "+func.name+" returning "+func.type.name);
             this.scriptFunctions.push(func);
         }
     }
 
     public static processScriptInfo() {
         for (let i = 0; i < this.document.length; i++) {
+            this.currentLine = i;
             const line = this.document[i];
             let isMatch = line.match(this.SCRIPT_STORE_REGEX);
             if (isMatch) {
@@ -531,10 +641,9 @@ export class Analyzer {
                 let parts = isMatch[0].split("<-");
                 let vName = parts[0].trim().split(".");
                 let vValue = parts[1].trim();
+                Analyzer.debug("part1 = "+parts[1].trim())
                 let vType = Type.DetermineValueType(vValue);
-                Analyzer.debug("checking: "+vValue)
                 if (vValue.match(/^ *[a-zA-Z0-9]+\(.*\) *$/)) { // function call, check if it is called correctly
-                    Analyzer.debug("is function")
                     let pts = vValue.split(/[\(|\)]/);
                     let fname = pts[0].trim();
                     let fargs = pts[1].trim();
