@@ -103,6 +103,7 @@ documents.onDidChangeContent(async change => {
 });
 
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
+	Analyzer.cleanUp();
 	Analyzer.processLexiconInfos();
 	Analyzer.processScriptFunctions();
 	Analyzer.processScriptInfo();

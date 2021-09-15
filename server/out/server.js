@@ -70,6 +70,7 @@ documents.onDidChangeContent(async (change) => {
     validateTextDocument(textDocument);
 });
 async function validateTextDocument(textDocument) {
+    analyzer_1.Analyzer.cleanUp();
     analyzer_1.Analyzer.processLexiconInfos();
     analyzer_1.Analyzer.processScriptFunctions();
     analyzer_1.Analyzer.processScriptInfo();

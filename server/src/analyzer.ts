@@ -149,8 +149,9 @@ export class Type {
 
     public static DetermineValueType(str: string): Type {
         // fonction call, get function return value
-        if (str.match(/^ *[a-zA-Z0-9]\(.*\) *$/)) {
-            let func = Func.FromString(str.trim());
+        if (str.match(/^ *[a-zA-Z0-9]+\(.*\) *$/)) {
+            str = str.trim()
+            let func = Func.FromString(str.split("(")[0]);
             if (!Func.isNull(func)) return func.type;
         }
         
@@ -364,10 +365,17 @@ export class Analyzer {
         this.document = document;
     }
 
-    public static processLexiconInfos() {
+    public static cleanUp() {
         this.LexiconErrors = [];
         this.lexiconTypes = [];
         this.lexiconAttrs = [];
+        this.scriptErrors = [];
+        this.scriptFunctions = [];
+        this.scriptAttrs = [];
+        this.scriptTypes = [];
+    }
+
+    public static processLexiconInfos() {
         // get lexicon range (first line included, last line not included)
         let lexiconStart = -1, lexiconEnd = -1;
         for (let i = this.document.length-1; i > 0; i--)
@@ -478,8 +486,6 @@ export class Analyzer {
     }
 
     public static processScriptFunctions() {
-        this.scriptErrors = [];
-        this.scriptFunctions = [];
         for (let i = 0; i < this.document.length; i++) {
             const line = this.document[i].trim();
             if (!line.match(this.SCRIPT_FUNC_REGEX)) continue
@@ -490,21 +496,24 @@ export class Analyzer {
                 this.scriptErrors.push(
                     new ScriptError("Declaration de fonction incorrecte", i, new Range(0, line.length))
                 );
-            let argsList = parts[1].trim().split(",");
+            let argChunk = parts[1].trim();
             let args: Attribute[] = [];
-            argsList.forEach(ar => {
-                let attr = ar.split(":");
-                if (attr[0].trim().length < 1 || attr[1].trim().length < 1) {
-                    this.scriptErrors.push(
-                        new ScriptError("Declaration d'arguments incorrecte", i, new Range(0, line.length))
-                    );
-                    return;
-                }
-                Analyzer.debug("new attribute: "+attr[0].trim()+" of type "+attr[1].trim());
-                args.push(new Attribute(attr[0].trim(), Type.FromString(attr[1].trim()), ""));
-            });
+            if (argChunk.length > 0) {
+                let argsList = argChunk.split(",");
+                argsList.forEach(ar => {
+                    let attr = ar.split(":");
+                    if (attr[0].trim().length < 1 || attr[1].trim().length < 1) {
+                        this.scriptErrors.push(
+                            new ScriptError("Declaration d'arguments incorrecte", i, new Range(0, line.length))
+                        );
+                        return;
+                    }
+                    Analyzer.debug("new attribute: "+attr[0].trim()+" of type "+attr[1].trim());
+                    args.push(new Attribute(attr[0].trim(), Type.FromString(attr[1].trim()), ""));
+                });
+            }
             let rt = parts[2].trim();
-            rt = rt.substring(1, rt.length);
+            rt = rt.substring(1, rt.length).trim();
             let rtype = (rt.length < 1)? new Type("Inconnu"): Type.FromString(rt);
             Analyzer.debug("type: "+rtype.name);
             let func = new Func(parts[0].trim(), args, rtype);
@@ -514,16 +523,56 @@ export class Analyzer {
     }
 
     public static processScriptInfo() {
-        this.scriptAttrs = [];
-        this.scriptTypes = [];
         for (let i = 0; i < this.document.length; i++) {
             const line = this.document[i];
             let isMatch = line.match(this.SCRIPT_STORE_REGEX);
             if (isMatch) {
+                // getting basic informations
                 let parts = isMatch[0].split("<-");
                 let vName = parts[0].trim().split(".");
                 let vValue = parts[1].trim();
                 let vType = Type.DetermineValueType(vValue);
+                Analyzer.debug("checking: "+vValue)
+                if (vValue.match(/^ *[a-zA-Z0-9]+\(.*\) *$/)) { // function call, check if it is called correctly
+                    Analyzer.debug("is function")
+                    let pts = vValue.split(/[\(|\)]/);
+                    let fname = pts[0].trim();
+                    let fargs = pts[1].trim();
+                    let func = Func.FromString(fname);
+                    if (Func.isNull(func)) {
+                        this.scriptErrors.push(
+                            new ScriptError("La fonction n'existe pas", i, new Range(0, line.length))
+                        );
+                        continue;
+                    }
+                    let argsPts = fargs.split(",");
+                    if (argsPts.length == 1 && argsPts[0].length == 0)
+                        argsPts = [];
+                    if (argsPts.length != func.args.length) {
+                        this.scriptErrors.push(
+                            new ScriptError("Le nombre d'arguments est incorrect ("+argsPts.length+" au lieu de "+func.args.length+")", i, new Range(0, line.length))
+                        );
+                        continue;
+                    }
+                    for (let j = 0; j < argsPts.length; j++) {
+                        const aName = argsPts[j].trim();
+                        const arg = Attribute.FromString(aName);
+                        const farg = func.args[j];
+                        if (Attribute.isNull(arg)) {
+                            this.scriptErrors.push(
+                                new ScriptError("L'attribut ["+aName+"] n'existe pas", i, new Range(0, line.length))
+                            );
+                            break;
+                        }
+                        if (!arg.type.equals(farg.type)) {
+                            this.scriptErrors.push(
+                                new ScriptError("Le type de l'attribut est incorrect (["+arg.type.name+"] au lieu de ["+farg.type.name+"])", i, new Range(0, line.length))
+                            );
+                            break;
+                        }
+                    }
+                }
+
                 if (vType.code == Type.UNKNOWN) { // look in scriptTypes for matching types
                     this.scriptTypes.concat(this.lexiconTypes).forEach(t => {
                         if (t.equals(vType)) vType == t;
