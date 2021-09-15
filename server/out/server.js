@@ -71,6 +71,7 @@ documents.onDidChangeContent(async (change) => {
 });
 async function validateTextDocument(textDocument) {
     analyzer_1.Analyzer.processLexiconInfos();
+    analyzer_1.Analyzer.processScriptFunctions();
     analyzer_1.Analyzer.processScriptInfo();
     let diagnostics = [];
     analyzer_1.Analyzer.LexiconErrors.forEach(e => {
@@ -140,14 +141,7 @@ connection.onCompletion((docPos) => {
     }
     else {
         let index = 0;
-        analyzer_1.Analyzer.lexiconTypes.forEach(t => {
-            compList.push({
-                label: t.name,
-                kind: node_1.CompletionItemKind.Class,
-                data: { index: index++, type: t }
-            });
-        });
-        analyzer_1.Analyzer.defaultTypes.forEach(t => {
+        analyzer_1.Analyzer.lexiconTypes.concat(analyzer_1.Analyzer.defaultTypes).forEach(t => {
             compList.push({
                 label: t.name,
                 kind: node_1.CompletionItemKind.Class,
@@ -155,17 +149,17 @@ connection.onCompletion((docPos) => {
             });
         });
         index = 0;
-        analyzer_1.Analyzer.lexiconAttrs.forEach(v => {
+        analyzer_1.Analyzer.lexiconAttrs.concat(analyzer_1.Analyzer.scriptAttrs).forEach(v => {
             compList.push({
                 label: v.name,
                 kind: node_1.CompletionItemKind.Variable,
                 data: { index: index++ }
             });
         });
-        analyzer_1.Analyzer.scriptAttrs.forEach(v => {
+        analyzer_1.Analyzer.scriptFunctions.forEach(f => {
             compList.push({
-                label: v.name,
-                kind: node_1.CompletionItemKind.Variable,
+                label: f.name,
+                kind: node_1.CompletionItemKind.Function,
                 data: { index: index++ }
             });
         });
@@ -193,6 +187,10 @@ connection.onCompletionResolve((item) => {
         let attr = new analyzer_1.Attribute(item.label, analyzer_1.Type.FromString(item.data.type));
         item.detail = "Attribut " + attr.name;
         item.documentation = { kind: node_1.MarkupKind.Markdown, value: analyzer_1.Attribute.GenerateDoc(attr, false) };
+    }
+    if (item.kind == node_1.CompletionItemKind.Function) {
+        item.detail = "Fonction";
+        item.documentation = { kind: node_1.MarkupKind.Markdown, value: "ouiiii" };
     }
     return item;
 });

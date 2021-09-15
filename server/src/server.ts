@@ -104,6 +104,7 @@ documents.onDidChangeContent(async change => {
 
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 	Analyzer.processLexiconInfos();
+	Analyzer.processScriptFunctions();
 	Analyzer.processScriptInfo();
 	let diagnostics: Diagnostic[] = [];
 	Analyzer.LexiconErrors.forEach(e => {
@@ -176,14 +177,7 @@ connection.onCompletion(
 			});
 		} else {
 			let index = 0;
-			Analyzer.lexiconTypes.forEach(t => {
-				compList.push({
-					label: t.name,
-					kind: CompletionItemKind.Class,
-					data: {index: index++, type: t}
-				});
-			});
-			Analyzer.defaultTypes.forEach(t => {
+			Analyzer.lexiconTypes.concat(Analyzer.defaultTypes).forEach(t => {
 				compList.push({
 					label: t.name,
 					kind: CompletionItemKind.Class,
@@ -191,17 +185,17 @@ connection.onCompletion(
 				});
 			});
 			index = 0;
-			Analyzer.lexiconAttrs.forEach(v => {
+			Analyzer.lexiconAttrs.concat(Analyzer.scriptAttrs).forEach(v => {
 				compList.push({
 					label: v.name,
 					kind: CompletionItemKind.Variable,
 					data: {index: index++}
 				});
 			});
-			Analyzer.scriptAttrs.forEach(v => {
+			Analyzer.scriptFunctions.forEach(f => {
 				compList.push({
-					label: v.name,
-					kind: CompletionItemKind.Variable,
+					label: f.name,
+					kind: CompletionItemKind.Function,
 					data: {index: index++}
 				});
 			});
@@ -231,6 +225,10 @@ connection.onCompletionResolve(
 			let attr = new Attribute(item.label, Type.FromString(item.data.type));
 			item.detail = "Attribut "+attr.name;
 			item.documentation = { kind: MarkupKind.Markdown, value: Attribute.GenerateDoc(attr, false) };
+		}
+		if (item.kind == CompletionItemKind.Function) {
+			item.detail = "Fonction";
+			item.documentation = { kind: MarkupKind.Markdown, value: "ouiiii" };
 		}
 		return item;
 	}

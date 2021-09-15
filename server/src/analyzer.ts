@@ -148,8 +148,14 @@ export class Type {
     }
 
     public static DetermineValueType(str: string): Type {
+        // fonction call, get function return value
+        if (str.match(/^ *[a-zA-Z0-9]\(.*\) *$/)) {
+            let func = Func.FromString(str.trim());
+            if (!Func.isNull(func)) return func.type;
+        }
+        
         // is couple of values
-        let mtch = str.match(/\(.*\)/); // TODO change composite detection
+        let mtch = str.match(/^ *\(.*\) *$/); // TODO change composite detection
         if (mtch) {
             let parts = mtch[0].substring(1, mtch[0].length-1).split(",");
             let attrs: Attribute[] = [];
@@ -294,6 +300,30 @@ export class Type {
     }
 }
 
+export class Func {
+    public name: string;
+    public args: Attribute[];
+    public type: Type;
+
+    public static isNull(func: Func) {
+        return func.name == "";
+    }
+
+    public static FromString(str: string): Func {
+        for (let i = 0; i < Analyzer.scriptFunctions.length; i++) {
+            const f = Analyzer.scriptFunctions[i];
+            if (f.name == str) return f;
+        }
+        return new Func();
+    }
+
+    public constructor(name: string = "", args: Attribute[] = [], type: Type = new Type()) {
+        this.name = name;
+        this.type = type;
+        this.args = args;
+    }
+}
+
 export class ScriptError {
     public message: string;
     public line: number;
@@ -308,6 +338,7 @@ export class ScriptError {
 export class Analyzer {
     public static scriptAttrs: Attribute[] = [];
     public static scriptTypes: Type[] = [];
+    public static scriptFunctions: Func[] = [];
     public static lexiconAttrs: Attribute[] = [];
     public static lexiconTypes: Type[] = [];
     public static LexiconErrors: ScriptError[] = [];
@@ -324,9 +355,10 @@ export class Analyzer {
         new Type("booleen"),
     ];
 
-    private static LEXICON_VAR_REGEX = / *[a-zA-Z][a-zA-Z0-9]* *: *[a-zA-Z][a-zA-Z0-9]* *(\/\/.*)*$/;
-    private static LEXICON_TYPE_REGEX = /^ *[a-zA-Z][a-zA-Z0-9]* *= *< *([a-z][a-zA-Z0-9]*) *: *([a-zA-Z0-9]+ *)(, *([a-z][a-zA-Z0-9]*) *: *([a-zA-Z0-9]+) *)*> *(\/\/.*)*$/;
-    private static SCRIPT_STORE_REGEX = /[^\s]+ *<-.*[^\s]+/;
+    public static LEXICON_VAR_REGEX = / *[a-zA-Z][a-zA-Z0-9]* *: *[a-zA-Z][a-zA-Z0-9]* *(\/\/.*)*$/;
+    public static LEXICON_TYPE_REGEX = /^ *[a-zA-Z][a-zA-Z0-9]* *= *< *([a-z][a-zA-Z0-9]*) *: *([a-zA-Z0-9]+ *)(, *([a-z][a-zA-Z0-9]*) *: *([a-zA-Z0-9]+) *)*> *(\/\/.*)*$/;
+    public static SCRIPT_STORE_REGEX = /[^\s]+ *<-.*[^\s]+/;
+    public static SCRIPT_FUNC_REGEX = /^(fonction) *[a-zA-Z0-9]+ *\(.*\)( *: *[a-zA-Z0-9]+ *)?$/;
 
     public static setDocument(document: string[]) {
         this.document = document;
@@ -445,10 +477,45 @@ export class Analyzer {
         }
     }
 
+    public static processScriptFunctions() {
+        this.scriptErrors = [];
+        this.scriptFunctions = [];
+        for (let i = 0; i < this.document.length; i++) {
+            const line = this.document[i].trim();
+            if (!line.match(this.SCRIPT_FUNC_REGEX)) continue
+            Analyzer.debug("line matching: "+line);
+            let chunk = line.substring(9, line.length) // remove "fonction" from line
+            let parts = chunk.split(/[\(|\)]/);
+            if (parts.length < 3)
+                this.scriptErrors.push(
+                    new ScriptError("Declaration de fonction incorrecte", i, new Range(0, line.length))
+                );
+            let argsList = parts[1].trim().split(",");
+            let args: Attribute[] = [];
+            argsList.forEach(ar => {
+                let attr = ar.split(":");
+                if (attr[0].trim().length < 1 || attr[1].trim().length < 1) {
+                    this.scriptErrors.push(
+                        new ScriptError("Declaration d'arguments incorrecte", i, new Range(0, line.length))
+                    );
+                    return;
+                }
+                Analyzer.debug("new attribute: "+attr[0].trim()+" of type "+attr[1].trim());
+                args.push(new Attribute(attr[0].trim(), Type.FromString(attr[1].trim()), ""));
+            });
+            let rt = parts[2].trim();
+            rt = rt.substring(1, rt.length);
+            let rtype = (rt.length < 1)? new Type("Inconnu"): Type.FromString(rt);
+            Analyzer.debug("type: "+rtype.name);
+            let func = new Func(parts[0].trim(), args, rtype);
+            Analyzer.debug("Adding new function "+func.name+" returning "+func.type.name);
+            this.scriptFunctions.push(func);
+        }
+    }
+
     public static processScriptInfo() {
         this.scriptAttrs = [];
         this.scriptTypes = [];
-        this.scriptErrors = [];
         for (let i = 0; i < this.document.length; i++) {
             const line = this.document[i];
             let isMatch = line.match(this.SCRIPT_STORE_REGEX);
