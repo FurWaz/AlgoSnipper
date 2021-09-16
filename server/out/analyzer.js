@@ -177,9 +177,7 @@ class Type {
         return res;
     }
     static DetermineValueType(str) {
-        let isOperation = false;
-        str.split(" ").forEach(l => { isOperation || (isOperation = l.match(Analyzer.SCRIPT_OPERATORS_REGEX) != null); });
-        if (isOperation)
+        if (str.match(Analyzer.SCRIPT_OPERATORS_REGEX))
             return Analyzer.getOperationType(str);
         // fonction call, get function return value
         if (str.match(/[a-zA-Z0-9]+\(.*\)/)) {
@@ -405,20 +403,66 @@ class Analyzer {
     static setDocument(document) {
         this.document = document;
     }
-    static getOperationType(str, sub = false) {
+    static getOperationType(str) {
+        // check if there is parenthesis to build them first
+        let parenthesis = new Range(0, 0);
+        while (parenthesis.start > -1 && parenthesis.end > -1) {
+            Analyzer.debug("str=" + str);
+            parenthesis = new Range(-1, -1);
+            let index = -1;
+            let parenthesisAmount = 0;
+            str.split("").forEach(l => {
+                index++;
+                if (l == '(') {
+                    parenthesisAmount++;
+                    if (parenthesis.start == -1)
+                        parenthesis.start = index;
+                }
+                if (l == ')') {
+                    parenthesisAmount--;
+                    if (parenthesisAmount == 0 && parenthesis.end == -1)
+                        parenthesis.end = index;
+                }
+            });
+            Analyzer.debug("parenthesis check: " + parenthesis.start + ", " + parenthesis.end);
+            if (parenthesis.start != -1 && parenthesis.end != -1) {
+                let type = this.getOperationType(str.substring(parenthesis.start + 1, parenthesis.end).trim()).code;
+                let res = "";
+                switch (type) {
+                    case Type.ENTIER:
+                        res = "0";
+                        break;
+                    case Type.REEL:
+                        res = "0.0";
+                        break;
+                    case Type.CARACTERE:
+                        res = "''";
+                        break;
+                    case Type.CHAINE:
+                        res = "\"\"";
+                        break;
+                    case Type.BOOLEEN:
+                        res = "vrai";
+                        break;
+                }
+                str = str.substring(0, parenthesis.start) + res + str.substring(parenthesis.end + 1, str.length);
+                Analyzer.debug("now, str=" + str);
+            }
+        }
         let str2op = (str) => {
             switch (str) {
                 case "et": return 1;
                 case "ou": return 2;
+                case "=": return 3;
                 case "<=":
                 case ">=":
                 case "<":
-                case ">": return 3;
+                case ">": return 4;
                 case "+":
-                case "-": return 4;
-                case "%": return 5;
+                case "-": return 5;
+                case "%": return 6;
                 case "*":
-                case "/": return 6;
+                case "/": return 7;
                 default: return 0;
             }
         };
@@ -470,10 +514,8 @@ class Analyzer {
         // go through the operations
         let index = 0;
         while (operations.length > 1) { // stop when only one object in the list (the result)
-            Analyzer.debug("new loop");
             const cur_ob = operations[index];
             const next_ob = operations[index + 1];
-            Analyzer.debug("cur=" + cur_ob.str + ", next=" + next_ob.str);
             if (str2op(cur_ob.op) < str2op(next_ob.op)) { // if the next operation is higher, execute it before
                 index++;
             }
@@ -484,12 +526,9 @@ class Analyzer {
                 if (index > 0)
                     index--;
             }
-            Analyzer.debug("----");
             operations.forEach(op => { Analyzer.debug(op.str + " " + op.op); });
-            Analyzer.debug("index=" + index + ", length=" + operations.length);
         }
         let type = Type.DetermineValueType(operations[0].str);
-        Analyzer.debug("Type = " + type.name);
         return type;
     }
     static cleanUp() {
@@ -628,6 +667,7 @@ class Analyzer {
         }
     }
     static processScriptInfo() {
+        Analyzer.debug("===");
         for (let i = 0; i < this.document.length; i++) {
             this.currentLine = i;
             const line = this.document[i];
@@ -796,6 +836,13 @@ class Analyzer {
                             this.scriptErrors.push(new ScriptError("Type de valeur incorrect ([" + vType.name + "] au lieu de [" + attr.type.name + "])", i, new Range(0, line.length)));
                     }
                 }
+            }
+            Analyzer.debug("no match");
+            // check for [pour] loops variables
+            isMatch = line.match(/^ *pour *(chaque)? * [^\s]*/);
+            if (isMatch) {
+                let parts = isMatch[0].split(" ");
+                Analyzer.scriptAttrs.push(new Attribute(parts[parts.length - 1], new Type("entier"), ""));
             }
         }
         ;
