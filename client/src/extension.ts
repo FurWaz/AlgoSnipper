@@ -27,18 +27,13 @@ export function activate(context: vscode.ExtensionContext) {
 		client.sendNotification("custom/getScriptInfo");
 	});
 	let launch: vscode.Disposable = vscode.commands.registerCommand('algosnipper.launch', function () {
-		vscode.window.showInformationMessage("Lancement de l'algorithme ...");
-		let program = vscode.window.activeTextEditor.document.getText().split("\n");
-		let output = vscode.window.createOutputChannel("Algorithme");
-		output.show(true);
-
-		output.appendLine("--- Désolé, cette fonctionnalité n'est pas encore disponible ---");
+		Interpreter.launch();
 	});
 
 	let doom: vscode.Disposable = vscode.commands.registerCommand('algosnipper.launchDoom', function () {
 		DoomView.createOrShow(vscode.Uri.file(context.extensionPath));
 	})
-
+	
 	// The server is implemented in node
 	let serverModule = context.asAbsolutePath(
 		path.join('server', 'out', 'server.js')

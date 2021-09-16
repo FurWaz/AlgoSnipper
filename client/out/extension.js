@@ -22,11 +22,6 @@ function activate(context) {
         client.sendNotification("custom/getScriptInfo");
     });
     let launch = vscode.commands.registerCommand('algosnipper.launch', function () {
-        vscode.window.showInformationMessage("Lancement de l'algorithme ...");
-        let program = vscode.window.activeTextEditor.document.getText().split("\n");
-        let output = vscode.window.createOutputChannel("Algorithme");
-        output.show(true);
-        output.appendLine("--- Désolé, cette fonctionnalité n'est pas encore disponible ---");
     });
     let doom = vscode.commands.registerCommand('algosnipper.launchDoom', function () {
         doom_1.DoomView.createOrShow(vscode.Uri.file(context.extensionPath));
