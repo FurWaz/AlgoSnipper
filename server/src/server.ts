@@ -21,7 +21,7 @@ import {
 } from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 
-import { Attribute, Type, Range, getWordRange, Analyzer } from './analyzer';
+import { Attribute, Type, Range, getWordRange, Analyzer, Func } from './analyzer';
 import { debug } from 'console';
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
@@ -228,8 +228,9 @@ connection.onCompletionResolve(
 			item.documentation = { kind: MarkupKind.Markdown, value: Attribute.GenerateDoc(attr, false) };
 		}
 		if (item.kind == CompletionItemKind.Function) {
-			item.detail = "Fonction";
-			item.documentation = { kind: MarkupKind.Markdown, value: "ouiiii" };
+			let func = Func.FromString(item.label);
+			item.detail = "Fonction "+item.label;
+			item.documentation = { kind: MarkupKind.Markdown, value: Func.GenerateDoc(func) };
 		}
 		return item;
 	}
@@ -262,6 +263,15 @@ connection.onHover(({ textDocument, position }): Hover | undefined => {
 			contents: {
 				kind: MarkupKind.Markdown,
 				value: Type.GenerateDoc(type),
+			}
+		};
+    }
+	let func = Func.FromString(vName);
+    if (!Func.isNull(func)) {
+		return {
+			contents: {
+				kind: MarkupKind.Markdown,
+				value: Func.GenerateDoc(func),
 			}
 		};
     }

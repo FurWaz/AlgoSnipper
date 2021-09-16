@@ -190,8 +190,9 @@ connection.onCompletionResolve((item) => {
         item.documentation = { kind: node_1.MarkupKind.Markdown, value: analyzer_1.Attribute.GenerateDoc(attr, false) };
     }
     if (item.kind == node_1.CompletionItemKind.Function) {
-        item.detail = "Fonction";
-        item.documentation = { kind: node_1.MarkupKind.Markdown, value: "ouiiii" };
+        let func = analyzer_1.Func.FromString(item.label);
+        item.detail = "Fonction " + item.label;
+        item.documentation = { kind: node_1.MarkupKind.Markdown, value: analyzer_1.Func.GenerateDoc(func) };
     }
     return item;
 });
@@ -221,6 +222,15 @@ connection.onHover(({ textDocument, position }) => {
             contents: {
                 kind: node_1.MarkupKind.Markdown,
                 value: analyzer_1.Type.GenerateDoc(type),
+            }
+        };
+    }
+    let func = analyzer_1.Func.FromString(vName);
+    if (!analyzer_1.Func.isNull(func)) {
+        return {
+            contents: {
+                kind: node_1.MarkupKind.Markdown,
+                value: analyzer_1.Func.GenerateDoc(func),
             }
         };
     }

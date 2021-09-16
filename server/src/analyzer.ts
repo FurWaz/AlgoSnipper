@@ -153,7 +153,7 @@ export class Type {
         if (isOperation) return Analyzer.getOperationType(str);
 
         // fonction call, get function return value
-        if (str.match(/^ *[a-zA-Z0-9]+\(.*\) *$/)) {
+        if (str.match(/[a-zA-Z0-9]+\(.*\)/)) {
             str = str.trim()
             let func = Func.FromString(str.split("(")[0]);
             if (!Func.isNull(func)) return func.type;
@@ -314,7 +314,19 @@ export class Func {
         return func.name == "";
     }
 
+    public static GenerateDoc(func: Func): string {
+        let res = "Fonction **"+func.name+"**";
+        res += "\n\n**Arguments:**";
+        res += "\n```algo";
+        func.args.forEach(arg => {
+            res += "\n"+arg.name+" ("+arg.type.name+")";
+        });
+        res += "\n```\n\n**Type de retour:**\n```algo\n"+func.type.name+"\n```";
+        return res;
+    }
+
     public static FromString(str: string): Func {
+        str = str.split("(")[0];
         for (let i = 0; i < Analyzer.scriptFunctions.length; i++) {
             const f = Analyzer.scriptFunctions[i];
             if (f.name == str) return f;
@@ -641,9 +653,8 @@ export class Analyzer {
                 let parts = isMatch[0].split("<-");
                 let vName = parts[0].trim().split(".");
                 let vValue = parts[1].trim();
-                Analyzer.debug("part1 = "+parts[1].trim())
                 let vType = Type.DetermineValueType(vValue);
-                if (vValue.match(/^ *[a-zA-Z0-9]+\(.*\) *$/)) { // function call, check if it is called correctly
+                if (vValue.match(/[a-zA-Z0-9]+\(.*\)/)) { // function call, check if it is called correctly
                     let pts = vValue.split(/[\(|\)]/);
                     let fname = pts[0].trim();
                     let fargs = pts[1].trim();
@@ -665,17 +676,18 @@ export class Analyzer {
                     }
                     for (let j = 0; j < argsPts.length; j++) {
                         const aName = argsPts[j].trim();
-                        const arg = Attribute.FromString(aName);
+                        Analyzer.debug("finding arg: "+aName);
+                        let arg = Type.DetermineValueType(aName);
                         const farg = func.args[j];
-                        if (Attribute.isNull(arg)) {
+                        if (Type.isNull(arg)) {
                             this.scriptErrors.push(
                                 new ScriptError("L'attribut ["+aName+"] n'existe pas", i, new Range(0, line.length))
                             );
                             break;
                         }
-                        if (!arg.type.equals(farg.type)) {
+                        if (!arg.equals(farg.type)) {
                             this.scriptErrors.push(
-                                new ScriptError("Le type de l'attribut est incorrect (["+arg.type.name+"] au lieu de ["+farg.type.name+"])", i, new Range(0, line.length))
+                                new ScriptError("Le type de l'attribut est incorrect (["+arg.name+"] au lieu de ["+farg.type.name+"])", i, new Range(0, line.length))
                             );
                             break;
                         }
