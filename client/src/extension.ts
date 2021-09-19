@@ -12,6 +12,7 @@ import {
 	ServerOptions,
 	TransportKind
 } from 'vscode-languageclient/node';
+import { Interpreter } from './interpreter/main';
 
 let client: LanguageClient;
 let output: vscode.OutputChannel;

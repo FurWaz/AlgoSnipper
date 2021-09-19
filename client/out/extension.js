@@ -9,6 +9,7 @@ const path = require("path");
 const vscode = require("vscode");
 const doom_1 = require("./doom");
 const node_1 = require("vscode-languageclient/node");
+const main_1 = require("./interpreter/main");
 let client;
 let output;
 function activate(context) {
@@ -22,6 +23,7 @@ function activate(context) {
         client.sendNotification("custom/getScriptInfo");
     });
     let launch = vscode.commands.registerCommand('algosnipper.launch', function () {
+        main_1.Interpreter.launch();
     });
     let doom = vscode.commands.registerCommand('algosnipper.launchDoom', function () {
         doom_1.DoomView.createOrShow(vscode.Uri.file(context.extensionPath));

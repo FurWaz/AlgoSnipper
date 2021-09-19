@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as algo from './common';
 
-class Interpreter {
+export class Interpreter {
     public static launch() {
         const lines = vscode.window.activeTextEditor.document.getText().split("\n");
         let output = vscode.window.createOutputChannel("Algosnipper");

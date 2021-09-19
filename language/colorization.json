@@ -14,7 +14,7 @@
             ]
         },
         "keywords": {
-            "match": "fonction[^a-zA-Z0-9]|algorithme[^a-zA-Z0-9]|tant que[^a-zA-Z0-9]|fpour[^a-zA-Z0-9]|pour[^a-zA-Z0-9]|ftant[^a-zA-Z0-9]|sinon[^a-zA-Z0-9]|alors[^a-zA-Z0-9]|si[^a-zA-Z0-9]|fsi[^a-zA-Z0-9]|debut[^a-zA-Z0-9]|fin[^a-zA-Z0-9]|a[^a-zA-Z0-9]|faire[^a-zA-Z0-9]|de[^a-zA-Z0-9]|retourne[^a-zA-Z0-9]|et[^a-zA-Z0-9]|non[^a-zA-Z0-9]|ou[^a-zA-Z0-9]|InOut[^a-zA-Z0-9]|mod[^a-zA-Z0-9]|chaque[^a-zA-Z0-9]|dans[^a-zA-Z0-9]|decroissant[^a-zA-Z0-9]|jusque[^a-zA-Z0-9]",
+            "match": "(fonction|algorithme|tant que|fpour|pour|ftant|sinon|alors|si|fsi|debut|fin|a|faire|de|retourne||InOut|chaque|dans|decroissant|jusque)[\\s]",
             "name": "keyword.letter"
         },
         "numbers": {
@@ -26,7 +26,7 @@
             "name": "entity.name.type.instance"
         },
         "arrow": {
-            "match": "←|◄-|<-|<=|=|<|>|>=|->|=>|-►|→|/|≠",
+            "match": "←|◄-|<-|<=|=|<|>|>=|->|=>|-►|→|/|≠|et |ou |mod |non |\\+|-|/|%|\\*",
             "name": "support.function"
         },
         "double-quote": {

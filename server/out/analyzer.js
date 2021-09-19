@@ -177,8 +177,7 @@ class Type {
         return res;
     }
     static DetermineValueType(str) {
-        if (str.match(Analyzer.SCRIPT_OPERATORS_REGEX))
-            return Analyzer.getOperationType(str);
+        Analyzer.debug("Determine value: " + str);
         // fonction call, get function return value
         if (str.match(/[a-zA-Z0-9]+\(.*\)/)) {
             str = str.trim();
@@ -186,6 +185,8 @@ class Type {
             if (!Func.isNull(func))
                 return func.type;
         }
+        if (str.match(Analyzer.SCRIPT_OPERATORS_REGEX))
+            return Analyzer.getOperationType(str);
         // is couple of values
         let mtch = str.match(/^ *\(.*\) *$/); // TODO change composite detection
         if (mtch) {
@@ -240,16 +241,30 @@ class Type {
             return new Type("entier");
         if (str.match(/^[0-9]+\.[0-9]+$/))
             return new Type("reel");
-        // get type from variable name
         let type = new Type();
-        Analyzer.lexiconAttrs.forEach(at => {
-            if (str == at.name)
-                type = at.type;
-        });
-        Analyzer.scriptAttrs.forEach(at => {
-            if (str == at.name)
-                type = at.type;
-        });
+        // is it a composite attribute
+        mtch = str.match(/[^\s](\.[^\s]+)*/);
+        if (mtch) {
+            Analyzer.debug("Composite variable");
+            let parts = str.split(".");
+            let name = parts.splice(0, 1)[0];
+            let attr = new Attribute();
+            Analyzer.debug("getting variable name: " + name);
+            Analyzer.lexiconAttrs.concat(Analyzer.scriptAttrs).forEach(at => {
+                if (name == at.name)
+                    attr = at;
+            });
+            Analyzer.debug("got type: " + attr.type.name);
+            parts.forEach(p => {
+                Analyzer.debug("Getting type of attribute " + p);
+                attr.type.attrs.forEach(at => {
+                    if (at.name == p.trim())
+                        attr = at;
+                });
+                Analyzer.debug("type found: " + attr.type.name);
+            });
+            type = new Type(attr.type.name, attr.type.attrs, attr.type.desc);
+        }
         return type;
     }
     static FromString(str) {
@@ -380,7 +395,7 @@ const opsDic = [
     { type1: Type.ENTIER, op: "<", type2: Type.REEL, res: Type.BOOLEEN }, { type1: Type.ENTIER, op: ">", type2: Type.REEL, res: Type.BOOLEEN },
     { type1: Type.ENTIER, op: "<=", type2: Type.REEL, res: Type.BOOLEEN }, { type1: Type.ENTIER, op: ">=", type2: Type.REEL, res: Type.BOOLEEN },
     { type1: Type.ENTIER, op: "=", type2: Type.ENTIER, res: Type.BOOLEEN }, { type1: Type.ENTIER, op: "=", type2: Type.REEL, res: Type.BOOLEEN },
-    { type1: Type.ENTIER, op: "%", type2: Type.ENTIER, res: Type.ENTIER },
+    { type1: Type.ENTIER, op: "%", type2: Type.ENTIER, res: Type.ENTIER }, { type1: Type.ENTIER, op: "mod", type2: Type.ENTIER, res: Type.ENTIER },
     // reel
     { type1: Type.REEL, op: "+", type2: Type.REEL, res: Type.REEL }, { type1: Type.REEL, op: "-", type2: Type.REEL, res: Type.REEL },
     { type1: Type.REEL, op: "/", type2: Type.REEL, res: Type.REEL }, { type1: Type.REEL, op: "*", type2: Type.REEL, res: Type.REEL },
@@ -391,7 +406,7 @@ const opsDic = [
     { type1: Type.REEL, op: "<", type2: Type.ENTIER, res: Type.BOOLEEN }, { type1: Type.REEL, op: ">", type2: Type.ENTIER, res: Type.BOOLEEN },
     { type1: Type.REEL, op: "<=", type2: Type.ENTIER, res: Type.BOOLEEN }, { type1: Type.REEL, op: ">=", type2: Type.ENTIER, res: Type.BOOLEEN },
     { type1: Type.REEL, op: "=", type2: Type.REEL, res: Type.BOOLEEN }, { type1: Type.REEL, op: "=", type2: Type.ENTIER, res: Type.BOOLEEN },
-    { type1: Type.ENTIER, op: "%", type2: Type.ENTIER, res: Type.ENTIER },
+    { type1: Type.REEL, op: "%", type2: Type.REEL, res: Type.REEL }, { type1: Type.REEL, op: "mod", type2: Type.REEL, res: Type.REEL },
     // chaine | caractere
     { type1: Type.CHAINE, op: "+", type2: Type.CHAINE, res: Type.CHAINE }, { type1: Type.CHAINE, op: "=", type2: Type.CHAINE, res: Type.BOOLEEN },
     { type1: Type.CARACTERE, op: "+", type2: Type.CARACTERE, res: Type.CHAINE }, { type1: Type.CARACTERE, op: "=", type2: Type.CARACTERE, res: Type.BOOLEEN },
@@ -407,7 +422,6 @@ class Analyzer {
         // check if there is parenthesis to build them first
         let parenthesis = new Range(0, 0);
         while (parenthesis.start > -1 && parenthesis.end > -1) {
-            Analyzer.debug("str=" + str);
             parenthesis = new Range(-1, -1);
             let index = -1;
             let parenthesisAmount = 0;
@@ -424,7 +438,6 @@ class Analyzer {
                         parenthesis.end = index;
                 }
             });
-            Analyzer.debug("parenthesis check: " + parenthesis.start + ", " + parenthesis.end);
             if (parenthesis.start != -1 && parenthesis.end != -1) {
                 let type = this.getOperationType(str.substring(parenthesis.start + 1, parenthesis.end).trim()).code;
                 let res = "";
@@ -446,7 +459,6 @@ class Analyzer {
                         break;
                 }
                 str = str.substring(0, parenthesis.start) + res + str.substring(parenthesis.end + 1, str.length);
-                Analyzer.debug("now, str=" + str);
             }
         }
         let str2op = (str) => {
@@ -471,7 +483,7 @@ class Analyzer {
             let t2 = Type.DetermineValueType(ob2);
             let res = "";
             opsDic.forEach(opd => {
-                if (t1.code == opd.type1 && t2.code == opd.type2 && op == opd.op) {
+                if (t1.code == opd.type1 && t2.code == opd.type2 && op.trim() == opd.op) {
                     switch (opd.res) {
                         case Type.ENTIER:
                             res = "0";
@@ -504,9 +516,17 @@ class Analyzer {
                 operations.push({ str: str.substring(lastPos, cursor).trim(), op: str[cursor] });
                 lastPos = cursor + 1;
             }
-            else if (str.substr(cursor, 2).match(/(<=|>=|et|ou)/)) {
+            else if (str.substr(cursor, 2).match(/(<=|>=)/)) {
                 operations.push({ str: str.substring(lastPos, cursor).trim(), op: str.substr(cursor, 2) });
                 lastPos = cursor + 2;
+            }
+            else if (str.substr(cursor, 4).match(/( et | ou )/)) {
+                operations.push({ str: str.substring(lastPos, cursor).trim(), op: str.substr(cursor, 4) });
+                lastPos = cursor + 4;
+            }
+            else if (str.substr(cursor, 5).match(/( mod )/)) {
+                operations.push({ str: str.substring(lastPos, cursor).trim(), op: str.substr(cursor, 5) });
+                lastPos = cursor + 5;
             }
             cursor++;
         }
@@ -526,7 +546,6 @@ class Analyzer {
                 if (index > 0)
                     index--;
             }
-            operations.forEach(op => { Analyzer.debug(op.str + " " + op.op); });
         }
         let type = Type.DetermineValueType(operations[0].str);
         return type;
@@ -667,7 +686,7 @@ class Analyzer {
         }
     }
     static processScriptInfo() {
-        Analyzer.debug("===");
+        Analyzer.debug("<===========>");
         for (let i = 0; i < this.document.length; i++) {
             this.currentLine = i;
             const line = this.document[i];
@@ -679,7 +698,25 @@ class Analyzer {
                 let vValue = parts[1].trim();
                 let vType = Type.DetermineValueType(vValue);
                 if (vValue.match(/[a-zA-Z0-9]+\(.*\)/)) { // function call, check if it is called correctly
-                    let pts = vValue.split(/[\(|\)]/);
+                    let pts = [];
+                    let parenthesis = new Range(-1, -1);
+                    let index = -1;
+                    let parenthesisAmount = 0;
+                    vValue.split("").forEach(l => {
+                        index++;
+                        if (l == '(') {
+                            parenthesisAmount++;
+                            if (parenthesis.start == -1)
+                                parenthesis.start = index;
+                        }
+                        if (l == ')') {
+                            parenthesisAmount--;
+                            if (parenthesisAmount == 0 && parenthesis.end == -1)
+                                parenthesis.end = index;
+                        }
+                    });
+                    pts.push(vValue.substring(0, parenthesis.start));
+                    pts.push(vValue.substring(parenthesis.start + 1, parenthesis.end));
                     let fname = pts[0].trim();
                     let fargs = pts[1].trim();
                     let func = Func.FromString(fname);
@@ -696,7 +733,6 @@ class Analyzer {
                     }
                     for (let j = 0; j < argsPts.length; j++) {
                         const aName = argsPts[j].trim();
-                        Analyzer.debug("finding arg: " + aName);
                         let arg = Type.DetermineValueType(aName);
                         const farg = func.args[j];
                         if (Type.isNull(arg)) {
@@ -837,12 +873,40 @@ class Analyzer {
                     }
                 }
             }
-            Analyzer.debug("no match");
             // check for [pour] loops variables
             isMatch = line.match(/^ *pour *(chaque)? * [^\s]*/);
             if (isMatch) {
                 let parts = isMatch[0].split(" ");
-                Analyzer.scriptAttrs.push(new Attribute(parts[parts.length - 1], new Type("entier"), ""));
+                let name = parts[parts.length - 1];
+                let attrType = new Type("entier");
+                // try to get the type
+                isMatch = line.match(/dans +[^\s]+/);
+                if (isMatch) {
+                    let parts = isMatch[0].split(" ");
+                    let ensemble = parts[parts.length - 1];
+                    // lists implementation required 
+                }
+                else {
+                    isMatch = line.match(/de +[^\s] +a +[^\s]+/);
+                    if (isMatch) {
+                        let parts = isMatch[0].split(" ");
+                        let startType = Type.DetermineValueType(parts[1]);
+                        let endType = Type.DetermineValueType(parts[1]);
+                        if (!startType.equals(endType))
+                            this.scriptErrors.push(new ScriptError("Le type de debut et de fin ne sont pas les memes", i, new Range(0, line.length)));
+                        else
+                            attrType = startType;
+                    }
+                }
+                let newAttr = new Attribute(name, attrType, "");
+                let exists = false;
+                this.scriptAttrs.concat(this.lexiconAttrs).forEach(at => {
+                    if (at.name == newAttr.name)
+                        exists = true;
+                });
+                if (!exists) {
+                    Analyzer.scriptAttrs.push(newAttr);
+                }
             }
         }
         ;
@@ -871,5 +935,5 @@ Analyzer.LEXICON_VAR_REGEX = / *[a-zA-Z][a-zA-Z0-9]* *: *[a-zA-Z][a-zA-Z0-9]* *(
 Analyzer.LEXICON_TYPE_REGEX = /^ *[a-zA-Z][a-zA-Z0-9]* *= *< *([a-z][a-zA-Z0-9]*) *: *([a-zA-Z0-9]+ *)(, *([a-z][a-zA-Z0-9]*) *: *([a-zA-Z0-9]+) *)*> *(\/\/.*)*$/;
 Analyzer.SCRIPT_STORE_REGEX = /[^\s]+.*<-.*[^\s]+/;
 Analyzer.SCRIPT_FUNC_REGEX = /^(fonction) *[a-zA-Z0-9]+ *\(.*\)( *: *[a-zA-Z0-9]+ *)?$/;
-Analyzer.SCRIPT_OPERATORS_REGEX = /(\+|-|\/|%|\*|<=|>=|=|<|>|\^|et|ou)/;
+Analyzer.SCRIPT_OPERATORS_REGEX = /(\+|-|\/|%|\*|<=|>=|=|<|>|\^| et | ou | mod )/;
 //# sourceMappingURL=analyzer.js.map
