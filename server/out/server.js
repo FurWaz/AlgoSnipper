@@ -7,6 +7,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const node_1 = require("vscode-languageserver/node");
 const vscode_languageserver_textdocument_1 = require("vscode-languageserver-textdocument");
 const analyzer_1 = require("./analyzer");
+const algo = require("./interpreter/common");
+const main_1 = require("./interpreter/main");
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
 let connection = (0, node_1.createConnection)(node_1.ProposedFeatures.all);
@@ -54,6 +56,7 @@ connection.onInitialized(() => {
             connection.console.log('Workspace folder change event received.');
         });
     }
+    main_1.Interpreter.init();
 });
 connection.onDidChangeConfiguration(change => {
     // Revalidate all open text documents
@@ -67,6 +70,8 @@ documents.onDidClose(e => {
 documents.onDidChangeContent(async (change) => {
     let textDocument = change.document;
     analyzer_1.Analyzer.setDocument(textDocument.getText().split("\n"));
+    algo.setScript(textDocument.getText().split("\n"));
+    main_1.Interpreter.processAlgorithm();
     validateTextDocument(textDocument);
 });
 async function validateTextDocument(textDocument) {
@@ -86,7 +91,18 @@ async function validateTextDocument(textDocument) {
             source: "AlgoSnipper"
         });
     });
-    analyzer_1.Analyzer.scriptErrors.forEach(e => {
+    // Analyzer.scriptErrors.forEach(e => {
+    // 	diagnostics.push({
+    // 		severity: DiagnosticSeverity.Error,
+    // 		range: {
+    // 			start: Position.create(e.line, e.range.start),
+    // 			end: Position.create(e.line, e.range.end)
+    // 		},
+    // 		message: e.message,
+    // 		source: "AlgoSnipper"
+    // 	});
+    // });
+    main_1.Interpreter.errors.forEach(e => {
         diagnostics.push({
             severity: node_1.DiagnosticSeverity.Error,
             range: {
@@ -107,92 +123,52 @@ connection.onDidChangeWatchedFiles(_change => {
 // This handler provides the initial list of the completion items.
 connection.onCompletion((docPos) => {
     let compList = [];
-    // is the completion global or for variable attributes
-    let isAttribute = false;
-    let range = (0, analyzer_1.getWordRange)(docPos.position.character - 1, analyzer_1.Analyzer.document[docPos.position.line]);
-    if (range != undefined)
-        isAttribute = analyzer_1.Analyzer.document[docPos.position.line][range.start - 1] == ".";
-    if (isAttribute) {
-        let range = new analyzer_1.Range(docPos.position.character - 2, docPos.position.character - 1);
-        while (analyzer_1.Analyzer.document[docPos.position.line][range.start].match(/[a-zA-Z0-9_\\.]/))
-            range.start--;
-        let path = analyzer_1.Analyzer.document[docPos.position.line].substring(range.start, range.end).trim().split(".");
-        let type = new analyzer_1.Type();
-        for (let i = 0; i < path.length; i++) {
-            const t_name = path[i];
-            if (analyzer_1.Type.isNull(type))
-                type = analyzer_1.Attribute.FromString(t_name).type;
-            else {
-                type.attrs.forEach(at => {
-                    if (at.name == t_name)
-                        type = at.type;
-                });
-            }
-        }
-        if (analyzer_1.Type.isNull(type))
-            return [];
-        let index = 0;
-        type.attrs.forEach(t => {
-            compList.push({
-                label: t.name,
-                kind: node_1.CompletionItemKind.Field,
-                data: { index: index++, type: t.type.name }
-            });
+    main_1.Interpreter.getFunctions().forEach(f => {
+        compList.push({
+            label: f.name,
+            kind: node_1.CompletionItemKind.Function,
+            data: { obj: f }
         });
-    }
-    else {
-        let index = 0;
-        analyzer_1.Analyzer.lexiconTypes.concat(analyzer_1.Analyzer.defaultTypes).forEach(t => {
-            compList.push({
-                label: t.name,
-                kind: node_1.CompletionItemKind.Class,
-                data: { index: index++, type: t }
-            });
+    });
+    main_1.Interpreter.getTypes().forEach(t => {
+        compList.push({
+            label: t.name,
+            kind: node_1.CompletionItemKind.Class,
+            data: { obj: t }
         });
-        index = 0;
-        analyzer_1.Analyzer.lexiconAttrs.concat(analyzer_1.Analyzer.scriptAttrs).forEach(v => {
+    });
+    main_1.Interpreter.getVars().forEach(v => {
+        let state = v.scope.isIncluded(docPos.position.line) ? " is included" : " is not included";
+        if (v.scope.isIncluded(docPos.position.line) || v.scope.isZero())
             compList.push({
                 label: v.name,
                 kind: node_1.CompletionItemKind.Variable,
-                data: { index: index++ }
+                data: { obj: v }
             });
-        });
-        analyzer_1.Analyzer.scriptFunctions.forEach(f => {
-            compList.push({
-                label: f.name,
-                kind: node_1.CompletionItemKind.Function,
-                data: { index: index++ }
-            });
-        });
-    }
+    });
     return compList;
 });
 // This handler resolves additional information for the item selected in
 // the completion list.
 connection.onCompletionResolve((item) => {
-    if (item.kind == node_1.CompletionItemKind.Class) {
-        let type = item.data.type;
-        item.detail = "Type " + type.name;
-        item.documentation = { kind: node_1.MarkupKind.Markdown, value: analyzer_1.Type.GenerateDoc(type) };
-    }
-    if (item.kind == node_1.CompletionItemKind.Variable) {
-        let attr;
-        if (item.data.index < analyzer_1.Analyzer.lexiconAttrs.length)
-            attr = analyzer_1.Analyzer.lexiconAttrs[item.data.index];
-        else
-            attr = analyzer_1.Analyzer.scriptAttrs[item.data.index - analyzer_1.Analyzer.lexiconAttrs.length];
-        item.detail = "Variable " + attr.name;
-        item.documentation = { kind: node_1.MarkupKind.Markdown, value: analyzer_1.Attribute.GenerateDoc(attr, true) };
-    }
-    if (item.kind == node_1.CompletionItemKind.Field) {
-        let attr = new analyzer_1.Attribute(item.label, analyzer_1.Type.FromString(item.data.type));
-        item.detail = "Attribut " + attr.name;
-        item.documentation = { kind: node_1.MarkupKind.Markdown, value: analyzer_1.Attribute.GenerateDoc(attr, false) };
-    }
-    if (item.kind == node_1.CompletionItemKind.Function) {
-        let func = analyzer_1.Func.FromString(item.label);
-        item.detail = "Fonction " + item.label;
-        item.documentation = { kind: node_1.MarkupKind.Markdown, value: analyzer_1.Func.GenerateDoc(func) };
+    switch (item.kind) {
+        case node_1.CompletionItemKind.Class:
+            item.detail = "Type " + item.data.obj.name;
+            item.documentation = { kind: node_1.MarkupKind.Markdown, value: algo.Type.getDoc(item.data.obj) };
+            break;
+        case node_1.CompletionItemKind.Variable:
+            item.detail = "Variable " + item.data.obj.name;
+            item.documentation = { kind: node_1.MarkupKind.Markdown, value: algo.Variable.getDoc(item.data.obj) };
+            break;
+        case node_1.CompletionItemKind.Function:
+            item.detail = "Fonction " + item.data.obj.name;
+            item.documentation = { kind: node_1.MarkupKind.Markdown, value: algo.Function.getDoc(item.data.obj) };
+            let args = "";
+            item.data.obj.args.forEach((a) => { args += a.name + ", "; });
+            item.label = item.data.obj.name + "(" + args.substring(0, args.length - 2) + ")";
+            break;
+        default:
+            break;
     }
     return item;
 });
@@ -272,6 +248,9 @@ connection.onNotification("custom/getScriptInfo", () => {
         types: analyzer_1.Analyzer.scriptTypes,
         bounds: analyzer_1.Analyzer.lexiconBounds
     });
+});
+connection.onNotification("custom/launchAlgo", () => {
+    main_1.Interpreter.launch(println);
 });
 function println(str) {
     connection.sendNotification("custom/log", str);

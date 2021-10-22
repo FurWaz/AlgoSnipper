@@ -23,6 +23,8 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 
 import { Attribute, Type, Range, getWordRange, Analyzer, Func } from './analyzer';
 import { debug } from 'console';
+import * as algo from './interpreter/common';
+import { Interpreter } from './interpreter/main';
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
 let connection = createConnection(ProposedFeatures.all);
@@ -82,6 +84,8 @@ connection.onInitialized(() => {
 			connection.console.log('Workspace folder change event received.');
 		});
 	}
+
+	Interpreter.init();
 });
 
 connection.onDidChangeConfiguration(change => {
@@ -99,6 +103,8 @@ documents.onDidClose(e => {
 documents.onDidChangeContent(async change => {
 	let textDocument = change.document;
 	Analyzer.setDocument(textDocument.getText().split("\n"));
+	algo.setScript(textDocument.getText().split("\n"));
+	Interpreter.processAlgorithm();
 	validateTextDocument(textDocument);
 });
 
@@ -119,7 +125,18 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 			source: "AlgoSnipper"
 		});
 	});
-	Analyzer.scriptErrors.forEach(e => {
+	// Analyzer.scriptErrors.forEach(e => {
+	// 	diagnostics.push({
+	// 		severity: DiagnosticSeverity.Error,
+	// 		range: {
+	// 			start: Position.create(e.line, e.range.start),
+	// 			end: Position.create(e.line, e.range.end)
+	// 		},
+	// 		message: e.message,
+	// 		source: "AlgoSnipper"
+	// 	});
+	// });
+	Interpreter.errors.forEach(e => {
 		diagnostics.push({
 			severity: DiagnosticSeverity.Error,
 			range: {
@@ -144,63 +161,30 @@ connection.onDidChangeWatchedFiles(_change => {
 connection.onCompletion(
 	(docPos: TextDocumentPositionParams): CompletionItem[] => {
 		let compList: CompletionItem[] = [];
-
-		// is the completion global or for variable attributes
-		let isAttribute = false;
-		let range = getWordRange(docPos.position.character-1, Analyzer.document[docPos.position.line]);
-		if (range != undefined)
-			isAttribute = Analyzer.document[docPos.position.line][range.start-1] == ".";
-		if (isAttribute) {
-			let range = new Range(docPos.position.character-2, docPos.position.character-1);
-			while (Analyzer.document[docPos.position.line][range.start].match(/[a-zA-Z0-9_\\.]/))
-				range.start--;
-			let path = Analyzer.document[docPos.position.line].substring(range.start, range.end).trim().split(".");
-			let type = new Type();
-			for (let i = 0; i < path.length; i++) {
-				const t_name = path[i];
-				if (Type.isNull(type))
-					type = Attribute.FromString(t_name).type;
-				else {
-					type.attrs.forEach(at => {
-						if (at.name == t_name)
-							type = at.type;
-					});
-				}
-			}
-			if (Type.isNull(type)) return [];
-			let index = 0;
-			type.attrs.forEach(t => {
-				compList.push({
-					label: t.name,
-					kind: CompletionItemKind.Field,
-					data: {index: index++, type: t.type.name}
-				});
+		Interpreter.getFunctions().forEach(f => {
+			compList.push({
+				label: f.name,
+				kind: CompletionItemKind.Function,
+				data: {obj: f}
 			});
-		} else {
-			let index = 0;
-			Analyzer.lexiconTypes.concat(Analyzer.defaultTypes).forEach(t => {
-				compList.push({
-					label: t.name,
-					kind: CompletionItemKind.Class,
-					data: {index: index++, type: t}
-				});
+		});
+		Interpreter.getTypes().forEach(t => {
+			compList.push({
+				label: t.name,
+				kind: CompletionItemKind.Class,
+				data: {obj: t}
 			});
-			index = 0;
-			Analyzer.lexiconAttrs.concat(Analyzer.scriptAttrs).forEach(v => {
+		});
+		Interpreter.getVars().forEach(v => {
+			let state = v.scope.isIncluded(docPos.position.line)? " is included": " is not included";
+			if (v.scope.isIncluded(docPos.position.line) || v.scope.isZero())
 				compList.push({
 					label: v.name,
 					kind: CompletionItemKind.Variable,
-					data: {index: index++}
+					data: {obj: v}
 				});
-			});
-			Analyzer.scriptFunctions.forEach(f => {
-				compList.push({
-					label: f.name,
-					kind: CompletionItemKind.Function,
-					data: {index: index++}
-				});
-			});
-		}
+		});
+
 		return compList;
 	}
 );
@@ -209,28 +193,27 @@ connection.onCompletion(
 // the completion list.
 connection.onCompletionResolve(
 	(item: CompletionItem): CompletionItem => {
-		if (item.kind == CompletionItemKind.Class) {
-			let type = item.data.type;
-			item.detail = "Type "+type.name;
-			item.documentation = { kind: MarkupKind.Markdown, value: Type.GenerateDoc(type) };
-		}
-		if (item.kind == CompletionItemKind.Variable) {
-			let attr: Attribute;
-			if (item.data.index < Analyzer.lexiconAttrs.length)
-				attr = Analyzer.lexiconAttrs[item.data.index];
-			else attr = Analyzer.scriptAttrs[item.data.index - Analyzer.lexiconAttrs.length];
-			item.detail = "Variable "+attr.name;
-			item.documentation = { kind: MarkupKind.Markdown, value: Attribute.GenerateDoc(attr, true) };
-		}
-		if (item.kind == CompletionItemKind.Field) {
-			let attr = new Attribute(item.label, Type.FromString(item.data.type));
-			item.detail = "Attribut "+attr.name;
-			item.documentation = { kind: MarkupKind.Markdown, value: Attribute.GenerateDoc(attr, false) };
-		}
-		if (item.kind == CompletionItemKind.Function) {
-			let func = Func.FromString(item.label);
-			item.detail = "Fonction "+item.label;
-			item.documentation = { kind: MarkupKind.Markdown, value: Func.GenerateDoc(func) };
+		switch (item.kind) {
+			case CompletionItemKind.Class:
+				item.detail = "Type "+item.data.obj.name;
+				item.documentation = { kind: MarkupKind.Markdown, value: algo.Type.getDoc(item.data.obj) }
+				break;
+
+			case CompletionItemKind.Variable:
+				item.detail = "Variable "+item.data.obj.name;
+				item.documentation = { kind: MarkupKind.Markdown, value: algo.Variable.getDoc(item.data.obj) }
+				break;
+
+			case CompletionItemKind.Function:
+				item.detail = "Fonction "+item.data.obj.name;
+				item.documentation = { kind: MarkupKind.Markdown, value: algo.Function.getDoc(item.data.obj) }
+				let args = "";
+				item.data.obj.args.forEach((a: any) => {args += a.name+", ";});
+				item.label = item.data.obj.name + "("+args.substring(0, args.length-2)+")";
+				break;
+
+			default:
+				break;
 		}
 		return item;
 	}
@@ -314,6 +297,10 @@ connection.onNotification("custom/getScriptInfo", () => {
 		types: Analyzer.scriptTypes,
 		bounds: Analyzer.lexiconBounds
 	});
+});
+
+connection.onNotification("custom/launchAlgo", () => {
+	Interpreter.launch(println);
 });
 
 function println(str: string) {

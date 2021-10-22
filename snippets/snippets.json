@@ -1,11 +1,4 @@
 {
-    "Template de [ecrire]": {
-        "scope": "algo",
-        "prefix": "ecrire",
-        "body": [
-            "ecrire(${1:valeur})"
-        ]
-    },
     "Template de [pour]": {
         "scope": "algo",
         "prefix": "pour",
@@ -69,6 +62,14 @@
             "sinon",
             "    $3",
             "fsi"
+        ]
+    },
+    "Template de [sinon]": {
+        "scope": "algo",
+        "prefix": "sinon",
+        "body": [
+            "sinon",
+            "    $1"
         ]
     },
     "Template de [fonction]": {

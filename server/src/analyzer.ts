@@ -148,7 +148,6 @@ export class Type {
     }
 
     public static DetermineValueType(str: string): Type {
-        Analyzer.debug("Determine value: "+str);
         // fonction call, get function return value
         if (str.match(/[a-zA-Z0-9]+\(.*\)/)) {
             str = str.trim()
@@ -217,23 +216,18 @@ export class Type {
         // is it a composite attribute
         mtch = str.match(/[^\s](\.[^\s]+)*/)
         if (mtch) {
-            Analyzer.debug("Composite variable");
             let parts = str.split(".");
             let name = parts.splice(0, 1)[0];
             let attr = new Attribute();
-            Analyzer.debug("getting variable name: "+name);
             Analyzer.lexiconAttrs.concat(Analyzer.scriptAttrs).forEach(at => {
                 if (name == at.name)
                     attr = at;
             });
-            Analyzer.debug("got type: "+attr.type.name);
             parts.forEach(p => {
-                Analyzer.debug("Getting type of attribute "+p);
                 attr.type.attrs.forEach(at => {
                     if (at.name == p.trim())
                         attr = at;
                 });
-                Analyzer.debug("type found: "+attr.type.name);
             });
             type = new Type(attr.type.name, attr.type.attrs, attr.type.desc);
         }
@@ -692,7 +686,6 @@ export class Analyzer {
     }
 
     public static processScriptInfo() {
-        Analyzer.debug("<===========>")
         for (let i = 0; i < this.document.length; i++) {
             this.currentLine = i;
             const line = this.document[i];
@@ -727,18 +720,18 @@ export class Analyzer {
                     let fargs = pts[1].trim();
                     let func = Func.FromString(fname);
                     if (Func.isNull(func)) {
-                        this.scriptErrors.push(
-                            new ScriptError("La fonction n'existe pas", i, new Range(0, line.length))
-                        );
+                        // this.scriptErrors.push(
+                        //     new ScriptError("La fonction n'existe pas", i, new Range(0, line.length))
+                        // );
                         continue;
                     }
                     let argsPts = fargs.split(",");
                     if (argsPts.length == 1 && argsPts[0].length == 0)
                         argsPts = [];
                     if (argsPts.length != func.args.length) {
-                        this.scriptErrors.push(
-                            new ScriptError("Le nombre d'arguments est incorrect ("+argsPts.length+" au lieu de "+func.args.length+")", i, new Range(0, line.length))
-                        );
+                        // this.scriptErrors.push(
+                        //     new ScriptError("Le nombre d'arguments est incorrect ("+argsPts.length+" au lieu de "+func.args.length+")", i, new Range(0, line.length))
+                        // );
                         continue;
                     }
                     for (let j = 0; j < argsPts.length; j++) {
@@ -776,13 +769,13 @@ export class Analyzer {
                     list.forEach(e => {
                         if (vName[0] == e.name) {
                             isInList = true;
-                            if (!vType.equals(e.type))
-                                this.scriptErrors.push(
-                                    new ScriptError(
-                                        "Type de valeur incorrect (["+vType.name+"] au lieu de ["+e.type.name+"])",
-                                        i, new Range(0, line.length)
-                                    )
-                                );
+                            // if (!vType.equals(e.type))
+                            //     this.scriptErrors.push(
+                            //         new ScriptError(
+                            //             "Type de valeur incorrect (["+vType.name+"] au lieu de ["+e.type.name+"])",
+                            //             i, new Range(0, line.length)
+                            //         )
+                            //     );
                         }
                     });
                     if (!isInList) this.scriptAttrs.push(new Attribute(vName[0], vType, ""));

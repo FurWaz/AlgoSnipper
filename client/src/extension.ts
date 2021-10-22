@@ -12,7 +12,6 @@ import {
 	ServerOptions,
 	TransportKind
 } from 'vscode-languageclient/node';
-import { Interpreter } from './interpreter/main';
 
 let client: LanguageClient;
 let output: vscode.OutputChannel;
@@ -28,7 +27,8 @@ export function activate(context: vscode.ExtensionContext) {
 		client.sendNotification("custom/getScriptInfo");
 	});
 	let launch: vscode.Disposable = vscode.commands.registerCommand('algosnipper.launch', function () {
-		Interpreter.launch();
+		output.clear();
+		client.sendNotification("custom/launchAlgo");
 	});
 
 	let doom: vscode.Disposable = vscode.commands.registerCommand('algosnipper.launchDoom', function () {
@@ -79,6 +79,7 @@ export function activate(context: vscode.ExtensionContext) {
 		output = vscode.window.createOutputChannel("Server output");
 		// output.show(true)
 		client.onNotification("custom/log", (message: string) => {
+			output.show(true);
 			output.appendLine(message);
 		});
 

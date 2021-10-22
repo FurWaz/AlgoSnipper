@@ -40,7 +40,7 @@ function saveScriptFunctions() {
                 if (typeName.length < 1)
                     return new algo.Error("Type d'argument incorrect", i, new algo.Range(0, line.length));
                 let argType = algo.Type.FromString(typeName);
-                argsList.push(new algo.Attribute(argName, argType));
+                argsList.push(new algo.Variable(argName, argType));
             }
             ;
             let start = i, end = i;
